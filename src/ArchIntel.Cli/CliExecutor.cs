@@ -19,6 +19,7 @@ internal static class CliExecutor
         string? format,
         bool? failOnLoadIssues,
         bool strict,
+        bool verbose,
         string reportKind,
         string? symbol,
         bool openOutput,
@@ -42,7 +43,7 @@ internal static class CliExecutor
         try
         {
             var loadResult = await pipelineTimer.TimeLoadSolutionAsync(
-                () => solutionLoader.LoadAsync(solution, failOnLoadIssuesEffective, cancellationSource.Token));
+                () => solutionLoader.LoadAsync(solution, failOnLoadIssuesEffective, verbose, cancellationSource.Token));
 
             var context = new AnalysisContext(
                 loadResult.SolutionPath,
@@ -107,9 +108,9 @@ internal static class CliExecutor
             {
                 SafeLog.Warn(
                     logger,
-                    "STRICT MODE: failing due to {LoadIssueCount} load issues and {ViolationCount} violations. See reports.",
-                    gatedLoadIssues,
-                    gatedViolations);
+                "STRICT MODE: failing due to {LoadIssueCount} load issues and {ViolationCount} violations. See scan_summary.json.",
+                gatedLoadIssues,
+                gatedViolations);
                 return ExitCodes.StrictModeFailure;
             }
 
@@ -118,14 +119,10 @@ internal static class CliExecutor
 
         if (loadIssueCount > 0)
         {
-            var hint = string.Equals(reportKind, "scan", StringComparison.OrdinalIgnoreCase)
-                ? "scan_summary.json"
-                : "reports";
             SafeLog.Warn(
                 logger,
-                "Completed with {Count} load issues (see {Hint}).",
-                loadIssueCount,
-                hint);
+                "Completed with {Count} load issues (see scan_summary.json).",
+                loadIssueCount);
         }
 
         return ExitCodes.Success;
@@ -217,7 +214,7 @@ internal static class CliExecutor
     {
         if (string.IsNullOrWhiteSpace(format))
         {
-            return ReportFormat.Json;
+            return ReportFormat.Both;
         }
 
         return format.Trim().ToLowerInvariant() switch

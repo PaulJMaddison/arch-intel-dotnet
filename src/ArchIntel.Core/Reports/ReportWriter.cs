@@ -35,18 +35,13 @@ public sealed class ReportWriter : IReportWriter
             return await WriteReportsAsync(context, reportKind, symbol, format, outputDirectory, cancellationToken);
         }
 
-        await context.PipelineTimer.TimeWriteReportsAsync(
-            () => WriteReportsAsync(context, reportKind, symbol, format, outputDirectory, cancellationToken));
-        // After timing, return the result of WriteReportsAsync
-        // (re-run WriteReportsAsync to get the result, or refactor to capture the result inside the timing)
-        // Best: capture the result inside the timing lambda
-        // So, change TimeWriteReportsAsync to accept Func<Task<ReportOutcome>> instead of Func<Task>
-        // But since signature is Task TimeWriteReportsAsync(Func<Task> action), you need to do:
-        // - Call WriteReportsAsync, store result, then return
+        ReportOutcome outcome = new(null);
+        await context.PipelineTimer.TimeWriteReportsAsync(async () =>
+        {
+            outcome = await WriteReportsAsync(context, reportKind, symbol, format, outputDirectory, cancellationToken);
+        });
 
-        // Instead, refactor to time inside WriteReportsAsync and return the result
-        // Or, if you must use TimeWriteReportsAsync, do this:
-        return await WriteReportsAsync(context, reportKind, symbol, format, outputDirectory, cancellationToken);
+        return outcome;
     }
 
     private async Task<ReportOutcome> WriteReportsAsync(
@@ -57,13 +52,16 @@ public sealed class ReportWriter : IReportWriter
         string outputDirectory,
         CancellationToken cancellationToken)
     {
+        ReportOutcome outcome;
         if (string.Equals(reportKind, "passport", StringComparison.OrdinalIgnoreCase))
         {
             var hashService = new DocumentHashService(_fileSystem);
             var cacheStore = new FileCacheStore(_fileSystem, hashService, context.CacheDir);
             var generator = new ArchitecturePassportGenerator(_fileSystem, cacheStore);
             await generator.WriteAsync(context, outputDirectory, cancellationToken);
-            return new ReportOutcome(null);
+            outcome = new ReportOutcome(null);
+            await WriteStandardOutputsAsync(context, reportKind, outputDirectory, cancellationToken);
+            return outcome;
         }
 
         if (string.Equals(reportKind, "project_graph", StringComparison.OrdinalIgnoreCase))
@@ -87,7 +85,9 @@ public sealed class ReportWriter : IReportWriter
                 await _fileSystem.WriteAllTextAsync(mdPath, markdown, cancellationToken);
             }
 
-            return new ReportOutcome(null);
+            outcome = new ReportOutcome(null);
+            await WriteStandardOutputsAsync(context, reportKind, outputDirectory, cancellationToken);
+            return outcome;
         }
 
         if (string.Equals(reportKind, "violations", StringComparison.OrdinalIgnoreCase))
@@ -109,7 +109,9 @@ public sealed class ReportWriter : IReportWriter
                 await _fileSystem.WriteAllTextAsync(mdPath, markdown, cancellationToken);
             }
 
-            return new ReportOutcome(rulesData.Violations.Count);
+            outcome = new ReportOutcome(rulesData.Violations.Count);
+            await WriteStandardOutputsAsync(context, reportKind, outputDirectory, cancellationToken);
+            return outcome;
         }
 
         if (string.Equals(reportKind, "impact", StringComparison.OrdinalIgnoreCase))
@@ -136,11 +138,32 @@ public sealed class ReportWriter : IReportWriter
                 await _fileSystem.WriteAllTextAsync(mdPath, markdown, cancellationToken);
             }
 
-            return new ReportOutcome(null);
+            outcome = new ReportOutcome(null);
+            await WriteStandardOutputsAsync(context, reportKind, outputDirectory, cancellationToken);
+            return outcome;
+        }
+
+        var reportFileName = reportKind.ToLowerInvariant();
+        if (string.Equals(reportKind, "scan", StringComparison.OrdinalIgnoreCase))
+        {
+            var scanData = ScanReceiptReport.Create(context);
+            var scanPath = Path.Combine(outputDirectory, $"{reportFileName}.json");
+            var scanJson = JsonSerializer.Serialize(scanData, new JsonSerializerOptions { WriteIndented = true });
+            await _fileSystem.WriteAllTextAsync(scanPath, scanJson, cancellationToken);
+
+            if (format is ReportFormat.Markdown or ReportFormat.Both)
+            {
+                var mdPath = Path.Combine(outputDirectory, $"{reportFileName}.md");
+                var markdown = ScanReceiptReport.BuildMarkdown(scanData);
+                await _fileSystem.WriteAllTextAsync(mdPath, markdown, cancellationToken);
+            }
+
+            outcome = new ReportOutcome(null);
+            await WriteStandardOutputsAsync(context, reportKind, outputDirectory, cancellationToken);
+            return outcome;
         }
 
         var data = ReportData.Create(context, reportKind, symbol);
-        var reportFileName = reportKind.ToLowerInvariant();
 
         if (format is ReportFormat.Json or ReportFormat.Both)
         {
@@ -156,13 +179,25 @@ public sealed class ReportWriter : IReportWriter
             await _fileSystem.WriteAllTextAsync(mdPath, markdown, cancellationToken);
         }
 
-        if (string.Equals(reportKind, "scan", StringComparison.OrdinalIgnoreCase))
+        outcome = new ReportOutcome(null);
+        await WriteStandardOutputsAsync(context, reportKind, outputDirectory, cancellationToken);
+        return outcome;
+    }
+
+    private async Task WriteStandardOutputsAsync(
+        AnalysisContext context,
+        string reportKind,
+        string outputDirectory,
+        CancellationToken cancellationToken)
+    {
+        if (!string.Equals(reportKind, "scan", StringComparison.OrdinalIgnoreCase))
         {
-            await ScanSummaryReport.WriteAsync(context, _fileSystem, outputDirectory, cancellationToken);
-            await SymbolIndexReport.WriteAsync(context, _fileSystem, outputDirectory, cancellationToken);
+            await ScanReceiptReport.WriteAsync(context, _fileSystem, outputDirectory, cancellationToken);
         }
 
-        return new ReportOutcome(null);
+        await ScanSummaryReport.WriteAsync(context, _fileSystem, outputDirectory, cancellationToken);
+        await SymbolIndexReport.WriteAsync(context, _fileSystem, outputDirectory, cancellationToken);
+        await OutputReadmeReport.WriteAsync(context, _fileSystem, outputDirectory, cancellationToken);
     }
 
     private static string BuildMarkdown(ReportData data)

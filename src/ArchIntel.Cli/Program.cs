@@ -25,10 +25,16 @@ internal static class Program
             IsRequired = true,
             Description = "Path to the solution file or directory."
         };
-        var outputOption = new Option<string?>("--out", "Output directory for reports.");
+        var outputOption = new Option<string?>(
+            "--out",
+            "Output directory for reports (defaults to ./.archintel in the solution directory).");
         var configOption = new Option<string?>("--config", "Path to the analysis config JSON file.");
-        var formatOption = new Option<string?>("--format", "Report format: json, md, or both.");
+        var formatOption = new Option<string?>(
+            "--format",
+            () => "both",
+            "Report format: json, md, or both.");
         var openOption = new Option<bool>("--open", "Open the report output directory after completion.");
+        var verboseOption = new Option<bool>("--verbose", "Print full MSBuild workspace diagnostics.");
         var failOnLoadIssuesOption = new Option<bool?>(
             "--fail-on-load-issues",
             "Fail if MSBuild reports fatal load issues.");
@@ -48,23 +54,38 @@ internal static class Program
             failOnLoadIssuesOption,
             strictOption
         };
-        scanCommand.SetHandler(async (solution, output, configPath, format, failOnLoadIssues, strict, openOutput) =>
+        async Task RunReportAsync(string reportKind, InvocationContext context)
         {
+            var solution = context.ParseResult.GetValueForOption(solutionOption);
+            var output = context.ParseResult.GetValueForOption(outputOption);
+            var configPath = context.ParseResult.GetValueForOption(configOption);
+            var format = context.ParseResult.GetValueForOption(formatOption);
+            var failOnLoadIssues = context.ParseResult.GetValueForOption(failOnLoadIssuesOption);
+            var strict = context.ParseResult.GetValueForOption(strictOption);
+            var verbose = context.ParseResult.GetValueForOption(verboseOption);
+            var openOutput = context.ParseResult.GetValueForOption(openOption);
+            var symbol = string.Equals(reportKind, "impact", StringComparison.OrdinalIgnoreCase)
+                ? context.ParseResult.GetValueForOption(symbolOption)
+                : null;
+
             await CliExecutor.RunReportAsync(
                 logger,
                 new SolutionLoader(logger),
                 new ReportWriter(),
-                solution,
+                solution!,
                 output,
                 configPath,
                 format,
                 failOnLoadIssues,
                 strict,
-                "scan",
-                null,
+                verbose,
+                reportKind,
+                symbol,
                 openOutput,
                 CancellationToken.None);
-        }, solutionOption, outputOption, configOption, formatOption, failOnLoadIssuesOption, strictOption, openOption);
+        }
+
+        scanCommand.SetHandler(async context => await RunReportAsync("scan", context));
 
         var passportCommand = new Command("passport", "Generate an architecture passport.")
         {
@@ -75,23 +96,7 @@ internal static class Program
             failOnLoadIssuesOption,
             strictOption
         };
-        passportCommand.SetHandler(async (solution, output, configPath, format, failOnLoadIssues, strict, openOutput) =>
-        {
-            await CliExecutor.RunReportAsync(
-                logger,
-                new SolutionLoader(logger),
-                new ReportWriter(),
-                solution,
-                output,
-                configPath,
-                format,
-                failOnLoadIssues,
-                strict,
-                "passport",
-                null,
-                openOutput,
-                CancellationToken.None);
-        }, solutionOption, outputOption, configOption, formatOption, failOnLoadIssuesOption, strictOption, openOption);
+        passportCommand.SetHandler(async context => await RunReportAsync("passport", context));
 
         var impactCommand = new Command("impact", "Analyze impact for a specific symbol.")
         {
@@ -103,23 +108,7 @@ internal static class Program
             failOnLoadIssuesOption,
             strictOption
         };
-        impactCommand.SetHandler(async (solution, symbol, output, configPath, format, failOnLoadIssues, strict, openOutput) =>
-        {
-            await CliExecutor.RunReportAsync(
-                logger,
-                new SolutionLoader(logger),
-                new ReportWriter(),
-                solution,
-                output,
-                configPath,
-                format,
-                failOnLoadIssues,
-                strict,
-                "impact",
-                symbol,
-                openOutput,
-                CancellationToken.None);
-        }, solutionOption, symbolOption, outputOption, configOption, formatOption, failOnLoadIssuesOption, strictOption, openOption);
+        impactCommand.SetHandler(async context => await RunReportAsync("impact", context));
 
         var projectGraphCommand = new Command("project-graph", "Generate a project dependency graph.")
         {
@@ -130,23 +119,7 @@ internal static class Program
             failOnLoadIssuesOption,
             strictOption
         };
-        projectGraphCommand.SetHandler(async (solution, output, configPath, format, failOnLoadIssues, strict, openOutput) =>
-        {
-            await CliExecutor.RunReportAsync(
-                logger,
-                new SolutionLoader(logger),
-                new ReportWriter(),
-                solution,
-                output,
-                configPath,
-                format,
-                failOnLoadIssues,
-                strict,
-                "project_graph",
-                null,
-                openOutput,
-                CancellationToken.None);
-        }, solutionOption, outputOption, configOption, formatOption, failOnLoadIssuesOption, strictOption, openOption);
+        projectGraphCommand.SetHandler(async context => await RunReportAsync("project_graph", context));
 
         var violationsCommand = new Command("violations", "Check architecture rules and drift.")
         {
@@ -157,25 +130,17 @@ internal static class Program
             failOnLoadIssuesOption,
             strictOption
         };
-        violationsCommand.SetHandler(async (solution, output, configPath, format, failOnLoadIssues, strict, openOutput) =>
-        {
-            await CliExecutor.RunReportAsync(
-                logger,
-                new SolutionLoader(logger),
-                new ReportWriter(),
-                solution,
-                output,
-                configPath,
-                format,
-                failOnLoadIssues,
-                strict,
-                "violations",
-                null,
-                openOutput,
-                CancellationToken.None);
-        }, solutionOption, outputOption, configOption, formatOption, failOnLoadIssuesOption, strictOption, openOption);
+        violationsCommand.SetHandler(async context => await RunReportAsync("violations", context));
 
-        var root = new RootCommand("ArchIntel CLI")
+        var root = new RootCommand(
+            """
+            ArchIntel CLI
+
+            Examples:
+              arch scan --solution ./MySolution.sln
+              arch scan --solution ./MySolution.sln --format both
+              arch impact --solution ./MySolution.sln --symbol My.Namespace.Type --format json
+            """)
         {
             scanCommand,
             passportCommand,
@@ -186,6 +151,7 @@ internal static class Program
 
         // Global options apply to all subcommands.
         root.AddGlobalOption(openOption);
+        root.AddGlobalOption(verboseOption);
 
         var parser = new CommandLineBuilder(root)
             .UseDefaults() // includes --help, --version, and standard middleware

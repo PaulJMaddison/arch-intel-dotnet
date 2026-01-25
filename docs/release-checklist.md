@@ -1,26 +1,25 @@
 # Release checklist
 
 ## Pre-release
-- All CI workflows are green.
-- Run `dotnet build -c Release` and `dotnet test -c Release` locally.
-- Bump version numbers where applicable.
-- Update `CHANGELOG.md` (if present).
-- Review docs and update screenshots or examples if needed.
+- Ensure CI is green on `main`.
+- Run locally:
+  - `dotnet build -c Release`
+  - `dotnet test -c Release`
+- Confirm documentation and README examples are up to date.
+- Confirm version numbers are set for the target release (e.g., `0.1.0`, `0.2.0`).
 
-## Release build
-- Perform a clean build (`dotnet clean`, then `dotnet build -c Release`).
-- Run `dotnet pack -c Release` to generate NuGet artifacts.
-- Verify nupkg metadata (version, description, repository URL).
+## Release build (win-x64)
+- Run the publish script:
+  - PowerShell: `./scripts/publish.ps1`
+  - Bash: `./scripts/publish.sh`
+- Verify the output zip in `./releases/archintel-v<version>-win-x64.zip`.
+- Smoke test by running `arch --version` from the published output.
 
-## Validation
-- Run the CLI against a known sample repository.
-- Perform the determinism check by running the same scan twice and diffing outputs.
-
-## Publish (future-facing)
-- Create and push a Git tag for the release.
-- Draft GitHub release notes.
-- Publish NuGet packages (placeholder until enabled).
+## Tag + publish
+- Create a signed tag: `git tag -a v0.1.0 -m "v0.1.0"` (adjust version).
+- Push tags: `git push origin v0.1.0`.
+- Draft GitHub release notes and upload the zip from `releases/`.
 
 ## Post-release
 - Announce the release in the appropriate channels.
-- Monitor feedback and open issues for regressions.
+- Open follow-up issues for any regressions or post-release fixes.

@@ -25,7 +25,9 @@ public static class ProjectGraphBuilder
         }
 
         nodes = nodes
-            .OrderBy(node => node.Id, StringComparer.Ordinal)
+            .OrderBy(node => node.Path, StringComparer.Ordinal)
+            .ThenBy(node => node.Name, StringComparer.Ordinal)
+            .ThenBy(node => node.Id, StringComparer.Ordinal)
             .ToList();
 
         var edgeSet = new HashSet<(string FromId, string ToId)>();

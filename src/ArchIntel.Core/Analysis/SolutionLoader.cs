@@ -18,10 +18,11 @@ public sealed class SolutionLoader : ISolutionLoader
     public async Task<SolutionLoadResult> LoadAsync(
         string solutionPathOrDirectory,
         bool failOnLoadIssues,
+        bool verbose,
         CancellationToken cancellationToken)
     {
         var solutionPath = ResolveSolutionPath(solutionPathOrDirectory);
-        var repoRootPath = ResolveRepoRootPath(solutionPath);
+        var repoRootPath = ResolveRepoRootPath(solutionPathOrDirectory, solutionPath);
 
         SafeLog.Info(_logger, "Loading solution {Solution}.", SafeLog.SanitizePath(solutionPath));
 
@@ -32,11 +33,14 @@ public sealed class SolutionLoader : ISolutionLoader
         workspace.WorkspaceFailed += (_, args) =>
         {
             diagnostics.Add(args.Diagnostic);
-            SafeLog.Warn(
-                _logger,
-                "MSBuild workspace {Kind}: {Message}",
-                args.Diagnostic.Kind,
-                SafeLog.SanitizeValue(args.Diagnostic.Message));
+            if (verbose)
+            {
+                SafeLog.Warn(
+                    _logger,
+                    "MSBuild workspace {Kind}: {Message}",
+                    args.Diagnostic.Kind,
+                    SafeLog.SanitizeValue(args.Diagnostic.Message));
+            }
         };
 
         Solution solution;
@@ -96,25 +100,21 @@ public sealed class SolutionLoader : ISolutionLoader
 
     internal static string ResolveRepoRootPath(string solutionPath)
     {
+        return ResolveRepoRootPath(solutionPath, solutionPath);
+    }
+
+    internal static string ResolveRepoRootPath(string solutionPathOrDirectory, string solutionPath)
+    {
+        var inputPath = Path.GetFullPath(solutionPathOrDirectory);
+        if (Directory.Exists(inputPath))
+        {
+            return inputPath;
+        }
+
         var directoryPath = Path.GetDirectoryName(solutionPath);
-        if (string.IsNullOrWhiteSpace(directoryPath))
-        {
-            return Directory.GetCurrentDirectory();
-        }
-
-        var current = new DirectoryInfo(directoryPath);
-        while (current is not null)
-        {
-            var gitPath = Path.Combine(current.FullName, ".git");
-            if (Directory.Exists(gitPath) || File.Exists(gitPath))
-            {
-                return current.FullName;
-            }
-
-            current = current.Parent;
-        }
-
-        return directoryPath;
+        return string.IsNullOrWhiteSpace(directoryPath)
+            ? Directory.GetCurrentDirectory()
+            : directoryPath;
     }
 
     private static int CountProjects(string solutionPath)
@@ -175,6 +175,9 @@ public sealed class SolutionLoader : ISolutionLoader
                 var isFatal = IsFatalWorkspaceDiagnostic(diagnostic);
                 return new LoadDiagnostic(diagnostic.Kind.ToString(), diagnostic.Message, isFatal);
             })
+            .OrderBy(diagnostic => diagnostic.Kind, StringComparer.Ordinal)
+            .ThenBy(diagnostic => diagnostic.Message, StringComparer.Ordinal)
+            .ThenBy(diagnostic => diagnostic.IsFatal)
             .ToList()
             .AsReadOnly();
 

@@ -1,3 +1,4 @@
+using System.Reflection;
 using ArchIntel.Configuration;
 using ArchIntel.IO;
 using Microsoft.CodeAnalysis;
@@ -27,7 +28,7 @@ public sealed class AnalysisContext
         OutputDir = Paths.GetReportsDirectory(RepoRootPath, config.OutputDir);
         CacheDir = Paths.GetCacheDirectory(RepoRootPath, config.CacheDir);
         MaxDegreeOfParallelism = config.GetEffectiveMaxDegreeOfParallelism();
-        AnalysisVersion = typeof(AnalysisContext).Assembly.GetName().Version?.ToString() ?? "unknown";
+        AnalysisVersion = ResolveAnalysisVersion();
     }
 
     public string SolutionPath { get; }
@@ -41,4 +42,16 @@ public sealed class AnalysisContext
     public int MaxDegreeOfParallelism { get; }
     public PipelineTimer? PipelineTimer { get; }
     public IReadOnlyList<LoadDiagnostic> LoadDiagnostics { get; }
+
+    private static string ResolveAnalysisVersion()
+    {
+        var assembly = typeof(AnalysisContext).Assembly;
+        var info = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
+        if (!string.IsNullOrWhiteSpace(info?.InformationalVersion))
+        {
+            return info.InformationalVersion;
+        }
+
+        return assembly.GetName().Version?.ToString() ?? "unknown";
+    }
 }
