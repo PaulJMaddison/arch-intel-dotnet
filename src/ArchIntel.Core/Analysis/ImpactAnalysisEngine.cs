@@ -87,31 +87,34 @@ public sealed class ImpactAnalysisEngine
             return ImpactAnalysisResult.NotFound(symbolName, suggestions);
         }
 
-        var referenceGroups = await SymbolFinder.FindReferencesAsync(matchingSymbols, solution, cancellationToken);
         var referenceLocations = new List<ReferenceLocationInfo>();
 
-        foreach (var referenceGroup in referenceGroups)
+        foreach (var symbol in matchingSymbols)
         {
-            foreach (var location in referenceGroup.Locations)
+            var referenceGroups = await SymbolFinder.FindReferencesAsync(symbol, solution, cancellationToken);
+            foreach (var referenceGroup in referenceGroups)
             {
-                var document = location.Document;
-                var filePath = document.FilePath;
-                if (string.IsNullOrWhiteSpace(filePath))
+                foreach (var location in referenceGroup.Locations)
                 {
-                    continue;
-                }
+                    var document = location.Document;
+                    var filePath = document.FilePath;
+                    if (string.IsNullOrWhiteSpace(filePath))
+                    {
+                        continue;
+                    }
 
-                if (_filter.IsExcluded(filePath))
-                {
-                    continue;
-                }
+                    if (_filter.IsExcluded(filePath))
+                    {
+                        continue;
+                    }
 
-                var lineSpan = location.Location.GetLineSpan();
-                referenceLocations.Add(new ReferenceLocationInfo(
-                    document.Project.Name,
-                    Path.GetFullPath(filePath),
-                    lineSpan.StartLinePosition.Line + 1,
-                    lineSpan.StartLinePosition.Character + 1));
+                    var lineSpan = location.Location.GetLineSpan();
+                    referenceLocations.Add(new ReferenceLocationInfo(
+                        document.Project.Name,
+                        Path.GetFullPath(filePath),
+                        lineSpan.StartLinePosition.Line + 1,
+                        lineSpan.StartLinePosition.Character + 1));
+                }
             }
         }
 
