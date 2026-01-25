@@ -54,24 +54,38 @@ internal static class Program
             failOnLoadIssuesOption,
             strictOption
         };
-        scanCommand.SetHandler(async (solution, output, configPath, format, failOnLoadIssues, strict, verbose, openOutput) =>
+        async Task RunReportAsync(string reportKind, InvocationContext context)
         {
+            var solution = context.ParseResult.GetValueForOption(solutionOption);
+            var output = context.ParseResult.GetValueForOption(outputOption);
+            var configPath = context.ParseResult.GetValueForOption(configOption);
+            var format = context.ParseResult.GetValueForOption(formatOption);
+            var failOnLoadIssues = context.ParseResult.GetValueForOption(failOnLoadIssuesOption);
+            var strict = context.ParseResult.GetValueForOption(strictOption);
+            var verbose = context.ParseResult.GetValueForOption(verboseOption);
+            var openOutput = context.ParseResult.GetValueForOption(openOption);
+            var symbol = string.Equals(reportKind, "impact", StringComparison.OrdinalIgnoreCase)
+                ? context.ParseResult.GetValueForOption(symbolOption)
+                : null;
+
             await CliExecutor.RunReportAsync(
                 logger,
                 new SolutionLoader(logger),
                 new ReportWriter(),
-                solution,
+                solution!,
                 output,
                 configPath,
                 format,
                 failOnLoadIssues,
                 strict,
                 verbose,
-                "scan",
-                null,
+                reportKind,
+                symbol,
                 openOutput,
                 CancellationToken.None);
-        }, solutionOption, outputOption, configOption, formatOption, failOnLoadIssuesOption, strictOption, verboseOption, openOption);
+        }
+
+        scanCommand.SetHandler(async context => await RunReportAsync("scan", context));
 
         var passportCommand = new Command("passport", "Generate an architecture passport.")
         {
@@ -82,24 +96,7 @@ internal static class Program
             failOnLoadIssuesOption,
             strictOption
         };
-        passportCommand.SetHandler(async (solution, output, configPath, format, failOnLoadIssues, strict, verbose, openOutput) =>
-        {
-            await CliExecutor.RunReportAsync(
-                logger,
-                new SolutionLoader(logger),
-                new ReportWriter(),
-                solution,
-                output,
-                configPath,
-                format,
-                failOnLoadIssues,
-                strict,
-                verbose,
-                "passport",
-                null,
-                openOutput,
-                CancellationToken.None);
-        }, solutionOption, outputOption, configOption, formatOption, failOnLoadIssuesOption, strictOption, verboseOption, openOption);
+        passportCommand.SetHandler(async context => await RunReportAsync("passport", context));
 
         var impactCommand = new Command("impact", "Analyze impact for a specific symbol.")
         {
@@ -111,24 +108,7 @@ internal static class Program
             failOnLoadIssuesOption,
             strictOption
         };
-        impactCommand.SetHandler(async (solution, symbol, output, configPath, format, failOnLoadIssues, strict, verbose, openOutput) =>
-        {
-            await CliExecutor.RunReportAsync(
-                logger,
-                new SolutionLoader(logger),
-                new ReportWriter(),
-                solution,
-                output,
-                configPath,
-                format,
-                failOnLoadIssues,
-                strict,
-                verbose,
-                "impact",
-                symbol,
-                openOutput,
-                CancellationToken.None);
-        }, solutionOption, symbolOption, outputOption, configOption, formatOption, failOnLoadIssuesOption, strictOption, verboseOption, openOption);
+        impactCommand.SetHandler(async context => await RunReportAsync("impact", context));
 
         var projectGraphCommand = new Command("project-graph", "Generate a project dependency graph.")
         {
@@ -139,24 +119,7 @@ internal static class Program
             failOnLoadIssuesOption,
             strictOption
         };
-        projectGraphCommand.SetHandler(async (solution, output, configPath, format, failOnLoadIssues, strict, verbose, openOutput) =>
-        {
-            await CliExecutor.RunReportAsync(
-                logger,
-                new SolutionLoader(logger),
-                new ReportWriter(),
-                solution,
-                output,
-                configPath,
-                format,
-                failOnLoadIssues,
-                strict,
-                verbose,
-                "project_graph",
-                null,
-                openOutput,
-                CancellationToken.None);
-        }, solutionOption, outputOption, configOption, formatOption, failOnLoadIssuesOption, strictOption, verboseOption, openOption);
+        projectGraphCommand.SetHandler(async context => await RunReportAsync("project_graph", context));
 
         var violationsCommand = new Command("violations", "Check architecture rules and drift.")
         {
@@ -167,24 +130,7 @@ internal static class Program
             failOnLoadIssuesOption,
             strictOption
         };
-        violationsCommand.SetHandler(async (solution, output, configPath, format, failOnLoadIssues, strict, verbose, openOutput) =>
-        {
-            await CliExecutor.RunReportAsync(
-                logger,
-                new SolutionLoader(logger),
-                new ReportWriter(),
-                solution,
-                output,
-                configPath,
-                format,
-                failOnLoadIssues,
-                strict,
-                verbose,
-                "violations",
-                null,
-                openOutput,
-                CancellationToken.None);
-        }, solutionOption, outputOption, configOption, formatOption, failOnLoadIssuesOption, strictOption, verboseOption, openOption);
+        violationsCommand.SetHandler(async context => await RunReportAsync("violations", context));
 
         var root = new RootCommand(
             """
