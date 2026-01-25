@@ -110,24 +110,15 @@ internal static class Program
 
         root.AddGlobalOption(openOption);
 
-        var versionOption = new Option<bool>("--version", "Show version information.");
-        root.AddOption(versionOption);
-        root.SetHandler((bool showVersion, InvocationContext context) =>
+        root.SetHandler(static (InvocationContext context) =>
         {
-            if (showVersion)
-            {
-                var version = typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown";
-                Console.WriteLine($"arch {version}");
-                return;
-            }
-
             var helpContext = new HelpContext(
                 context.HelpBuilder,
                 context.ParseResult.CommandResult.Command,
                 Console.Out,
                 context.ParseResult);
             context.HelpBuilder.Write(helpContext);
-        }, versionOption);
+        });
 
         var parser = new CommandLineBuilder(root)
             .UseDefaults()

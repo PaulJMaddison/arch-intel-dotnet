@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace ArchIntel.Analysis;
 
 public static class ProjectLayerClassifier
@@ -6,19 +8,19 @@ public static class ProjectLayerClassifier
     [
         ("Tests", ["test", "tests", "spec", "specs"]),
         ("Presentation", ["api", "web", "ui", "presentation", "frontend", "client"]),
-        ("Application", ["application", "app", "service", "services", "usecase", "usecases"]),
+        ("Application", ["application", "service", "services", "usecase", "usecases"]),
         ("Domain", ["domain", "core", "model", "models"]),
         ("Infrastructure", ["infrastructure", "infra", "data", "persistence", "repository", "repositories", "storage"])
     ];
 
     public static string Classify(string name, string path)
     {
-        var haystack = $"{name} {path}".ToLowerInvariant();
-        foreach (var (layer, tokens) in LayerTokens)
+        var tokens = new HashSet<string>(Tokenize(name).Concat(Tokenize(path)), StringComparer.Ordinal);
+        foreach (var (layer, layerTokens) in LayerTokens)
         {
-            foreach (var token in tokens)
+            foreach (var token in layerTokens)
             {
-                if (haystack.Contains(token, StringComparison.Ordinal))
+                if (tokens.Contains(token))
                 {
                     return layer;
                 }
@@ -26,5 +28,34 @@ public static class ProjectLayerClassifier
         }
 
         return "Unknown";
+    }
+
+    private static IEnumerable<string> Tokenize(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            yield break;
+        }
+
+        var builder = new StringBuilder();
+        foreach (var ch in value)
+        {
+            if (char.IsLetterOrDigit(ch))
+            {
+                builder.Append(char.ToLowerInvariant(ch));
+                continue;
+            }
+
+            if (builder.Length > 0)
+            {
+                yield return builder.ToString();
+                builder.Clear();
+            }
+        }
+
+        if (builder.Length > 0)
+        {
+            yield return builder.ToString();
+        }
     }
 }
