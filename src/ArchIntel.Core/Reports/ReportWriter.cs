@@ -82,6 +82,33 @@ public sealed class ReportWriter
             return;
         }
 
+        if (string.Equals(reportKind, "impact", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(symbol))
+            {
+                throw new ArgumentException("Impact analysis requires a symbol name.", nameof(symbol));
+            }
+
+            var impactData = await ImpactAnalysisReport.CreateAsync(context, symbol, cancellationToken);
+            var baseFileName = "impact";
+
+            if (format is ReportFormat.Json or ReportFormat.Both)
+            {
+                var jsonPath = Path.Combine(outputDirectory, $"{baseFileName}.json");
+                var json = JsonSerializer.Serialize(impactData, new JsonSerializerOptions { WriteIndented = true });
+                await _fileSystem.WriteAllTextAsync(jsonPath, json, cancellationToken);
+            }
+
+            if (format is ReportFormat.Markdown or ReportFormat.Both)
+            {
+                var mdPath = Path.Combine(outputDirectory, $"{baseFileName}.md");
+                var markdown = ImpactAnalysisReport.BuildMarkdown(impactData);
+                await _fileSystem.WriteAllTextAsync(mdPath, markdown, cancellationToken);
+            }
+
+            return;
+        }
+
         var data = ReportData.Create(context, reportKind, symbol);
         var baseFileName = reportKind.ToLowerInvariant();
 
