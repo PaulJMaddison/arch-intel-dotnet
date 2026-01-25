@@ -1,7 +1,6 @@
 using ArchIntel.Analysis;
 using ArchIntel.Configuration;
 using ArchIntel.Reports;
-using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -13,15 +12,17 @@ public sealed class ScanIntegrationTests
     public async Task ScanReport_IsDeterministic()
     {
         using var temp = new TemporaryDirectory();
-        var solution = CreateSolution(temp.Path);
+        var solutionPath = GetTestSolutionPath();
+        var loader = new SolutionLoader(NullLogger.Instance);
+        var loadResult = await loader.LoadAsync(solutionPath, CancellationToken.None);
 
         var output1 = Path.Combine(temp.Path, "output1");
         var cache1 = Path.Combine(temp.Path, "cache1");
         var output2 = Path.Combine(temp.Path, "output2");
         var cache2 = Path.Combine(temp.Path, "cache2");
 
-        var first = await RunScanAsync(solution, temp.Path, output1, cache1);
-        var second = await RunScanAsync(solution, temp.Path, output2, cache2);
+        var first = await RunScanAsync(loadResult.Solution, loadResult.RepoRootPath, output1, cache1);
+        var second = await RunScanAsync(loadResult.Solution, loadResult.RepoRootPath, output2, cache2);
 
         Assert.Equal(first.Count, second.Count);
         foreach (var entry in first)
@@ -77,38 +78,26 @@ public sealed class ScanIntegrationTests
         return outputs;
     }
 
-    private static Solution CreateSolution(string repoRoot)
+    private static string GetTestSolutionPath()
     {
-        var workspace = new AdhocWorkspace();
-        var solution = workspace.CurrentSolution;
+        var repoRoot = FindRepoRoot(AppContext.BaseDirectory);
+        return Path.Combine(repoRoot, "tests", "TestData", "SampleSolution", "ArchIntel.TestData.sln");
+    }
 
-        var appId = ProjectId.CreateNewId();
-        var dataId = ProjectId.CreateNewId();
+    private static string FindRepoRoot(string startDirectory)
+    {
+        var current = new DirectoryInfo(startDirectory);
+        while (current is not null)
+        {
+            if (Directory.Exists(Path.Combine(current.FullName, ".git")))
+            {
+                return current.FullName;
+            }
 
-        var appPath = Path.Combine(repoRoot, "src", "App", "App.csproj");
-        var dataPath = Path.Combine(repoRoot, "src", "Data", "Data.csproj");
-        Directory.CreateDirectory(Path.GetDirectoryName(appPath)!);
-        Directory.CreateDirectory(Path.GetDirectoryName(dataPath)!);
+            current = current.Parent;
+        }
 
-        solution = solution.AddProject(ProjectInfo.Create(appId, VersionStamp.Create(), "App", "App", LanguageNames.CSharp, filePath: appPath));
-        solution = solution.AddProject(ProjectInfo.Create(dataId, VersionStamp.Create(), "Data", "Data", LanguageNames.CSharp, filePath: dataPath));
-        solution = solution.AddProjectReference(appId, new ProjectReference(dataId));
-
-        solution = solution.AddDocument(
-                DocumentId.CreateNewId(appId),
-                "Program.cs",
-                "namespace App; public class Program { }",
-                filePath: Path.Combine(repoRoot, "src", "App", "Program.cs"))
-            .Project.Solution;
-
-        solution = solution.AddDocument(
-                DocumentId.CreateNewId(dataId),
-                "Repository.cs",
-                "namespace Data; public class Repository { }",
-                filePath: Path.Combine(repoRoot, "src", "Data", "Repository.cs"))
-            .Project.Solution;
-
-        return solution;
+        throw new DirectoryNotFoundException("Unable to locate repository root for test data.");
     }
 
     private sealed class TemporaryDirectory : IDisposable

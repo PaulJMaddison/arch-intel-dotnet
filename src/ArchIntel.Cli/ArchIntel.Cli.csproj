@@ -3,6 +3,10 @@
     <OutputType>Exe</OutputType>
     <AssemblyName>arch</AssemblyName>
     <RootNamespace>ArchIntel</RootNamespace>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>arch</ToolCommandName>
+    <PackageId>ArchIntel.Cli</PackageId>
+    <RepositoryUrl>https://github.com/arch-intel/arch-intel-dotnet</RepositoryUrl>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../ArchIntel.Core/ArchIntel.Core.csproj" />

@@ -2,6 +2,7 @@
   <PropertyGroup>
     <AssemblyName>ArchIntel.Core</AssemblyName>
     <RootNamespace>ArchIntel</RootNamespace>
+    <PackageId>ArchIntel.Core</PackageId>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Build.Locator" Version="1.6.10" />

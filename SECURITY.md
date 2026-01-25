@@ -1,12 +1,12 @@
 # Security Policy
 
 ## Overview
-ArchIntel is designed to be local-first. By default:
+ArchIntel is designed to be local-first by default:
 - No source code leaves your machine.
 - No network calls are made.
-- Logs never include source code content.
+- Logs avoid source code content.
 
-Reports are written to `./.archtool/reports` and are intended to be safe, high-level summaries.
+Reports are written to `./.archtool/reports` and are intended to be high-level summaries suitable for sharing internally.
 
 ## Reporting a vulnerability
 Please report security issues privately by emailing **security@example.com**. Include:

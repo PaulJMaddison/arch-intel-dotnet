@@ -1,5 +1,8 @@
 # ArchIntel
 
+[![CI](https://github.com/arch-intel/arch-intel-dotnet/actions/workflows/ci.yml/badge.svg)](https://github.com/arch-intel/arch-intel-dotnet/actions/workflows/ci.yml)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](LICENSE)
+
 **Local-first architecture intelligence for large .NET solutions.** ArchIntel is a .NET 8 CLI (`arch`) that runs entirely on your machine, producing deterministic reports without sending source code anywhere.
 
 ## Why ArchIntel
@@ -35,6 +38,11 @@ arch impact --solution ./MySolution.sln --symbol My.Namespace.Type --format json
 # Open the output directory after completion
 arch scan --solution ./MySolution.sln --open
 ```
+
+## Developer Workflow
+Run the build scripts from the repo root to restore, build, test, and verify formatting:
+- macOS/Linux: `./build.sh`
+- Windows (PowerShell): `./build.ps1`
 
 ### Config file
 ArchIntel reads configuration from `./.archtool/config.json` by default, or from `--config`.
