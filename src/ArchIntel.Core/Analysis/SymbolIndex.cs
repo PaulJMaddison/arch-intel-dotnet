@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace ArchIntel.Analysis;
@@ -84,7 +83,7 @@ public sealed class SymbolIndex
                 project.Id.Id.ToString(),
                 Path.GetFullPath(document.FilePath),
                 contentHash);
-            var status = await _cache.GetStatusAsync(cacheKey, token);
+            _ = await _cache.GetStatusAsync(cacheKey, token);
 
             var root = await document.GetSyntaxRootAsync(token);
             if (root is null)
@@ -92,22 +91,21 @@ public sealed class SymbolIndex
                 return;
             }
 
-            SemanticModel? semanticModel = null;
-            if (status == CacheStatus.Miss)
+            var semanticModel = await document.GetSemanticModelAsync(token);
+            if (semanticModel is null)
             {
-                semanticModel = await document.GetSemanticModelAsync(token);
+                return;
             }
 
-            foreach (var syntaxSymbol in CollectSyntaxSymbols(root))
+            foreach (var syntaxSymbol in CollectSyntaxSymbols(root, semanticModel, token))
             {
-                var symbol = semanticModel is null ? null : semanticModel.GetDeclaredSymbol(syntaxSymbol.Node, token);
-                var symbolId = SymbolIdFactory.Create(symbol, syntaxSymbol, project.Id.Id.ToString());
+                var symbolId = SymbolIdFactory.Create(syntaxSymbol.Symbol, syntaxSymbol, project.Id.Id.ToString());
                 if (!symbolIds.TryAdd(symbolId, 0))
                 {
                     continue;
                 }
 
-                var entry = CreateEntry(symbol, syntaxSymbol, project, symbolId);
+                var entry = CreateEntry(syntaxSymbol, project, symbolId);
                 symbols.Add(entry);
 
                 var counterKey = (entry.ProjectId, entry.Namespace);
@@ -144,15 +142,15 @@ public sealed class SymbolIndex
         return new SymbolIndexData(symbolList, namespaceList);
     }
 
-    private static SymbolIndexEntry CreateEntry(ISymbol? symbol, SyntaxSymbol syntaxSymbol, Project project, string symbolId)
+    private static SymbolIndexEntry CreateEntry(SyntaxSymbol syntaxSymbol, Project project, string symbolId)
     {
-        if (symbol is not null)
+        if (syntaxSymbol.Symbol is not null)
         {
-            var (symbolNamespace, containingType) = SymbolIdFactory.GetSymbolContainer(symbol);
+            var (symbolNamespace, containingType) = SymbolIdFactory.GetSymbolContainer(syntaxSymbol.Symbol);
             return new SymbolIndexEntry(
                 symbolId,
                 syntaxSymbol.Kind.ToString(),
-                symbol.Name,
+                syntaxSymbol.Symbol.Name,
                 symbolNamespace,
                 containingType,
                 project.Name,
@@ -169,45 +167,73 @@ public sealed class SymbolIndex
             project.Id.Id.ToString());
     }
 
-    private static IEnumerable<SyntaxSymbol> CollectSyntaxSymbols(SyntaxNode root)
+    private static IEnumerable<SyntaxSymbol> CollectSyntaxSymbols(
+        SyntaxNode root,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
     {
         foreach (var node in root.DescendantNodes())
         {
             switch (node)
             {
                 case ClassDeclarationSyntax classDeclaration:
-                    yield return SyntaxSymbol.CreateNamedType(classDeclaration);
+                    yield return SyntaxSymbol.CreateNamedType(
+                        classDeclaration,
+                        semanticModel.GetDeclaredSymbol(classDeclaration, cancellationToken));
                     break;
                 case StructDeclarationSyntax structDeclaration:
-                    yield return SyntaxSymbol.CreateNamedType(structDeclaration);
+                    yield return SyntaxSymbol.CreateNamedType(
+                        structDeclaration,
+                        semanticModel.GetDeclaredSymbol(structDeclaration, cancellationToken));
                     break;
                 case InterfaceDeclarationSyntax interfaceDeclaration:
-                    yield return SyntaxSymbol.CreateNamedType(interfaceDeclaration);
+                    yield return SyntaxSymbol.CreateNamedType(
+                        interfaceDeclaration,
+                        semanticModel.GetDeclaredSymbol(interfaceDeclaration, cancellationToken));
                     break;
                 case RecordDeclarationSyntax recordDeclaration:
-                    yield return SyntaxSymbol.CreateNamedType(recordDeclaration);
+                    yield return SyntaxSymbol.CreateNamedType(
+                        recordDeclaration,
+                        semanticModel.GetDeclaredSymbol(recordDeclaration, cancellationToken));
                     break;
                 case EnumDeclarationSyntax enumDeclaration:
-                    yield return SyntaxSymbol.CreateEnum(enumDeclaration);
+                    yield return SyntaxSymbol.CreateEnum(
+                        enumDeclaration,
+                        semanticModel.GetDeclaredSymbol(enumDeclaration, cancellationToken));
                     break;
                 case DelegateDeclarationSyntax delegateDeclaration:
-                    yield return SyntaxSymbol.CreateDelegate(delegateDeclaration);
+                    yield return SyntaxSymbol.CreateDelegate(
+                        delegateDeclaration,
+                        semanticModel.GetDeclaredSymbol(delegateDeclaration, cancellationToken));
                     break;
-                case MethodDeclarationSyntax methodDeclaration when IsPublicMethod(methodDeclaration):
-                    yield return SyntaxSymbol.CreateMethod(methodDeclaration);
+                case MethodDeclarationSyntax methodDeclaration:
+                {
+                    var methodSymbol = semanticModel.GetDeclaredSymbol(methodDeclaration, cancellationToken) as IMethodSymbol;
+                    if (IsPublicMethod(methodSymbol))
+                    {
+                        yield return SyntaxSymbol.CreateMethod(methodDeclaration, methodSymbol);
+                    }
+
                     break;
+                }
             }
         }
     }
 
-    private static bool IsPublicMethod(MethodDeclarationSyntax methodDeclaration)
+    private static bool IsPublicMethod(IMethodSymbol? methodSymbol)
     {
-        if (methodDeclaration.Modifiers.Any(modifier => modifier.IsKind(SyntaxKind.PublicKeyword)))
+        if (methodSymbol is null)
         {
-            return true;
+            return false;
         }
 
-        return methodDeclaration.Parent is InterfaceDeclarationSyntax;
+        // Count only ordinary public methods; exclude constructors, operators, and accessors.
+        if (methodSymbol.MethodKind != MethodKind.Ordinary)
+        {
+            return false;
+        }
+
+        return methodSymbol.DeclaredAccessibility == Accessibility.Public;
     }
 
     private readonly record struct ProjectKey(string ProjectId, string ProjectName);
@@ -255,9 +281,10 @@ public sealed class SymbolIndex
         string Name,
         string Namespace,
         string? ContainingType,
-        IReadOnlyList<string> ParameterTypes)
+        IReadOnlyList<string> ParameterTypes,
+        ISymbol? Symbol)
     {
-        public static SyntaxSymbol CreateNamedType(TypeDeclarationSyntax node)
+        public static SyntaxSymbol CreateNamedType(TypeDeclarationSyntax node, ISymbol? symbol)
         {
             return new SyntaxSymbol(
                 node,
@@ -265,10 +292,11 @@ public sealed class SymbolIndex
                 node.Identifier.Text,
                 NamespaceHelper.GetNamespace(node),
                 NamespaceHelper.GetContainingTypes(node),
-                Array.Empty<string>());
+                Array.Empty<string>(),
+                symbol);
         }
 
-        public static SyntaxSymbol CreateEnum(EnumDeclarationSyntax node)
+        public static SyntaxSymbol CreateEnum(EnumDeclarationSyntax node, ISymbol? symbol)
         {
             return new SyntaxSymbol(
                 node,
@@ -276,10 +304,11 @@ public sealed class SymbolIndex
                 node.Identifier.Text,
                 NamespaceHelper.GetNamespace(node),
                 NamespaceHelper.GetContainingTypes(node),
-                Array.Empty<string>());
+                Array.Empty<string>(),
+                symbol);
         }
 
-        public static SyntaxSymbol CreateDelegate(DelegateDeclarationSyntax node)
+        public static SyntaxSymbol CreateDelegate(DelegateDeclarationSyntax node, ISymbol? symbol)
         {
             return new SyntaxSymbol(
                 node,
@@ -287,10 +316,11 @@ public sealed class SymbolIndex
                 node.Identifier.Text,
                 NamespaceHelper.GetNamespace(node),
                 NamespaceHelper.GetContainingTypes(node),
-                Array.Empty<string>());
+                Array.Empty<string>(),
+                symbol);
         }
 
-        public static SyntaxSymbol CreateMethod(MethodDeclarationSyntax node)
+        public static SyntaxSymbol CreateMethod(MethodDeclarationSyntax node, ISymbol? symbol)
         {
             var parameterTypes = node.ParameterList.Parameters
                 .Select(parameter => parameter.Type?.ToString() ?? "unknown")
@@ -302,7 +332,8 @@ public sealed class SymbolIndex
                 node.Identifier.Text,
                 NamespaceHelper.GetNamespace(node),
                 NamespaceHelper.GetContainingTypes(node),
-                parameterTypes);
+                parameterTypes,
+                symbol);
         }
     }
 
