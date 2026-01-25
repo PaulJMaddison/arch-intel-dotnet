@@ -95,7 +95,20 @@ Download the zip from `releases/archintel-v0.1.0-win-x64.zip`, unzip it, and run
 - **Knobs:** `maxDegreeOfParallelism` controls parallel symbol indexing and scan throughput. Keep it under your CPU core count for predictable performance.
 
 ## Works without AI. Optional AI guidance.
-ArchIntel works entirely without AI. If you choose to integrate AI guidance, that is optional and must be configured outside of the core tool. The open-source CLI never uploads source code by default.
+ArchIntel works entirely without AI. If you choose to integrate AI guidance, that is optional and must be configured outside of the core tool. The open-source CLI never uploads source code by default. 
+
+## Using ArchIntel outputs with AI tools (optional)
+
+ArchIntel is designed to produce structured, deterministic artifacts that can be used with any AI tool of your choice.
+
+Common workflows:
+
+Paste scan_summary.json to ask for a high-level architecture overview.
+Paste namespaces.json to identify large namespaces, hot spots, or boundary candidates.
+Paste symbols.json to explore public APIs and dependency surfaces.
+Paste scan.md (if generated) for human-readable context.
+
+This allows teams to use AI for interpretation and reasoning without granting AI tools direct access to source code or repositories. The open-source CLI never uploads source code or connects to external services.
 
 ## Pro & Enterprise
 We offer commercial licensing for teams that want access to advanced modules such as architecture governance, performance and scalability analysis, private extensions, and enterprise support. Commercial capabilities are delivered on an outcome basis. No public roadmap commitments are made in the open source repository.
