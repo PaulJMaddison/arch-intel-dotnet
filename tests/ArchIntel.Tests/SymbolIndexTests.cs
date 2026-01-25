@@ -20,18 +20,16 @@ public sealed class SymbolIndexTests
         solution = solution.AddProject(ProjectInfo.Create(projectB, VersionStamp.Create(), "Beta", "Beta", LanguageNames.CSharp, filePath: "/repo/src/Beta/Beta.csproj"));
 
         solution = solution.AddDocument(
-                DocumentId.CreateNewId(projectA),
-                "Widget.cs",
-                @"namespace Alpha; public class Widget { public void Ping() { } internal void Hidden() { } }",
-                filePath: "/repo/src/Alpha/Widget.cs")
-            .Project.Solution;
+            DocumentId.CreateNewId(projectA),
+            "Widget.cs",
+            @"namespace Alpha; public class Widget { public void Ping() { } internal void Hidden() { } }",
+            filePath: "/repo/src/Alpha/Widget.cs");
 
         solution = solution.AddDocument(
-                DocumentId.CreateNewId(projectB),
-                "Gadget.cs",
-                @"namespace Beta { public class Gadget { public int Calc() => 1; } }",
-                filePath: "/repo/src/Beta/Gadget.cs")
-            .Project.Solution;
+            DocumentId.CreateNewId(projectB),
+            "Gadget.cs",
+            @"namespace Beta { public class Gadget { public int Calc() => 1; } }",
+            filePath: "/repo/src/Beta/Gadget.cs");
 
         var index = CreateIndex();
         var data = await index.BuildAsync(solution, "test-version", CancellationToken.None);
@@ -60,18 +58,16 @@ public sealed class SymbolIndexTests
         solution = solution.AddProject(ProjectInfo.Create(projectB, VersionStamp.Create(), "Beta", "Beta", LanguageNames.CSharp, filePath: "/repo/src/Beta/Beta.csproj"));
 
         solution = solution.AddDocument(
-                DocumentId.CreateNewId(projectA),
-                "Shared.cs",
-                @"namespace Shared; public class SharedType { }",
-                filePath: "/repo/src/Alpha/Shared.cs")
-            .Project.Solution;
+            DocumentId.CreateNewId(projectA),
+            "Shared.cs",
+            @"namespace Shared; public class SharedType { }",
+            filePath: "/repo/src/Alpha/Shared.cs");
 
         solution = solution.AddDocument(
-                DocumentId.CreateNewId(projectB),
-                "Shared.cs",
-                @"namespace Shared; public class SharedType { }",
-                filePath: "/repo/src/Beta/Shared.cs")
-            .Project.Solution;
+            DocumentId.CreateNewId(projectB),
+            "Shared.cs",
+            @"namespace Shared; public class SharedType { }",
+            filePath: "/repo/src/Beta/Shared.cs");
 
         var index = CreateIndex();
         var data = await index.BuildAsync(solution, "test-version", CancellationToken.None);
@@ -92,18 +88,16 @@ public sealed class SymbolIndexTests
         solution = solution.AddProject(ProjectInfo.Create(projectA, VersionStamp.Create(), "Alpha", "Alpha", LanguageNames.CSharp, filePath: "/repo/src/Alpha/Alpha.csproj"));
 
         solution = solution.AddDocument(
-                DocumentId.CreateNewId(projectA),
-                "Part1.cs",
-                @"namespace Dup; public partial class DupType { }",
-                filePath: "/repo/src/Alpha/Part1.cs")
-            .Project.Solution;
+            DocumentId.CreateNewId(projectA),
+            "Part1.cs",
+            @"namespace Dup; public partial class DupType { }",
+            filePath: "/repo/src/Alpha/Part1.cs");
 
         solution = solution.AddDocument(
-                DocumentId.CreateNewId(projectA),
-                "Part2.cs",
-                @"namespace Dup; public partial class DupType { public void Run() { } }",
-                filePath: "/repo/src/Alpha/Part2.cs")
-            .Project.Solution;
+            DocumentId.CreateNewId(projectA),
+            "Part2.cs",
+            @"namespace Dup; public partial class DupType { public void Run() { } }",
+            filePath: "/repo/src/Alpha/Part2.cs");
 
         var index = CreateIndex();
         var data = await index.BuildAsync(solution, "test-version", CancellationToken.None);

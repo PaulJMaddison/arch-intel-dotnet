@@ -63,18 +63,18 @@ public sealed class ReportWriter
             var graphData = context.PipelineTimer is null
                 ? ProjectGraphReport.Create(context)
                 : context.PipelineTimer.TimeBuildProjectGraph(() => ProjectGraphReport.Create(context));
-            var baseFileName = "project_graph";
+            var projectGraphFileName = "project_graph";
 
             if (format is ReportFormat.Json or ReportFormat.Both)
             {
-                var jsonPath = Path.Combine(outputDirectory, $"{baseFileName}.json");
+                var jsonPath = Path.Combine(outputDirectory, $"{projectGraphFileName}.json");
                 var json = JsonSerializer.Serialize(graphData, new JsonSerializerOptions { WriteIndented = true });
                 await _fileSystem.WriteAllTextAsync(jsonPath, json, cancellationToken);
             }
 
             if (format is ReportFormat.Markdown or ReportFormat.Both)
             {
-                var mdPath = Path.Combine(outputDirectory, $"{baseFileName}.md");
+                var mdPath = Path.Combine(outputDirectory, $"{projectGraphFileName}.md");
                 var markdown = ProjectGraphReport.BuildMarkdown(graphData);
                 await _fileSystem.WriteAllTextAsync(mdPath, markdown, cancellationToken);
             }
@@ -85,18 +85,18 @@ public sealed class ReportWriter
         if (string.Equals(reportKind, "violations", StringComparison.OrdinalIgnoreCase))
         {
             var rulesData = await ArchitectureRulesReport.CreateAsync(context, cancellationToken);
-            var baseFileName = "violations";
+            var violationsFileName = "violations";
 
             if (format is ReportFormat.Json or ReportFormat.Both)
             {
-                var jsonPath = Path.Combine(outputDirectory, $"{baseFileName}.json");
+                var jsonPath = Path.Combine(outputDirectory, $"{violationsFileName}.json");
                 var json = JsonSerializer.Serialize(rulesData, new JsonSerializerOptions { WriteIndented = true });
                 await _fileSystem.WriteAllTextAsync(jsonPath, json, cancellationToken);
             }
 
             if (format is ReportFormat.Markdown or ReportFormat.Both)
             {
-                var mdPath = Path.Combine(outputDirectory, $"{baseFileName}.md");
+                var mdPath = Path.Combine(outputDirectory, $"{violationsFileName}.md");
                 var markdown = ArchitectureRulesReport.BuildMarkdown(rulesData);
                 await _fileSystem.WriteAllTextAsync(mdPath, markdown, cancellationToken);
             }
@@ -112,18 +112,18 @@ public sealed class ReportWriter
             }
 
             var impactData = await ImpactAnalysisReport.CreateAsync(context, symbol, cancellationToken);
-            var baseFileName = "impact";
+            var impactFileName = "impact";
 
             if (format is ReportFormat.Json or ReportFormat.Both)
             {
-                var jsonPath = Path.Combine(outputDirectory, $"{baseFileName}.json");
+                var jsonPath = Path.Combine(outputDirectory, $"{impactFileName}.json");
                 var json = JsonSerializer.Serialize(impactData, new JsonSerializerOptions { WriteIndented = true });
                 await _fileSystem.WriteAllTextAsync(jsonPath, json, cancellationToken);
             }
 
             if (format is ReportFormat.Markdown or ReportFormat.Both)
             {
-                var mdPath = Path.Combine(outputDirectory, $"{baseFileName}.md");
+                var mdPath = Path.Combine(outputDirectory, $"{impactFileName}.md");
                 var markdown = ImpactAnalysisReport.BuildMarkdown(impactData);
                 await _fileSystem.WriteAllTextAsync(mdPath, markdown, cancellationToken);
             }
@@ -132,18 +132,18 @@ public sealed class ReportWriter
         }
 
         var data = ReportData.Create(context, reportKind, symbol);
-        var baseFileName = reportKind.ToLowerInvariant();
+        var reportFileName = reportKind.ToLowerInvariant();
 
         if (format is ReportFormat.Json or ReportFormat.Both)
         {
-            var jsonPath = Path.Combine(outputDirectory, $"{baseFileName}.json");
+            var jsonPath = Path.Combine(outputDirectory, $"{reportFileName}.json");
             var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
             await _fileSystem.WriteAllTextAsync(jsonPath, json, cancellationToken);
         }
 
         if (format is ReportFormat.Markdown or ReportFormat.Both)
         {
-            var mdPath = Path.Combine(outputDirectory, $"{baseFileName}.md");
+            var mdPath = Path.Combine(outputDirectory, $"{reportFileName}.md");
             var markdown = BuildMarkdown(data);
             await _fileSystem.WriteAllTextAsync(mdPath, markdown, cancellationToken);
         }

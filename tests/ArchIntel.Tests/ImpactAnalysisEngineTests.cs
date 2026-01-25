@@ -54,25 +54,22 @@ public sealed class ImpactAnalysisEngineTests
         solution = solution.AddProjectReference(projectC, new ProjectReference(projectA));
 
         solution = solution.AddDocument(
-                DocumentId.CreateNewId(projectA),
-                "Service.cs",
-                "namespace Alpha; public class Service { }",
-                filePath: "/repo/src/Alpha/Service.cs")
-            .Project.Solution;
+            DocumentId.CreateNewId(projectA),
+            "Service.cs",
+            "namespace Alpha; public class Service { }",
+            filePath: "/repo/src/Alpha/Service.cs");
 
         solution = solution.AddDocument(
-                DocumentId.CreateNewId(projectB),
-                "UseService.cs",
-                "using Alpha; namespace Beta; public class UseService { public Service Field = new(); }",
-                filePath: "/repo/src/Beta/UseService.cs")
-            .Project.Solution;
+            DocumentId.CreateNewId(projectB),
+            "UseService.cs",
+            "using Alpha; namespace Beta; public class UseService { public Service Field = new(); }",
+            filePath: "/repo/src/Beta/UseService.cs");
 
         solution = solution.AddDocument(
-                DocumentId.CreateNewId(projectC),
-                "OtherUseService.cs",
-                "using Alpha; namespace Gamma; public class OtherUseService { public Service Field = new(); }",
-                filePath: "/repo/src/Gamma/OtherUseService.cs")
-            .Project.Solution;
+            DocumentId.CreateNewId(projectC),
+            "OtherUseService.cs",
+            "using Alpha; namespace Gamma; public class OtherUseService { public Service Field = new(); }",
+            filePath: "/repo/src/Gamma/OtherUseService.cs");
 
         var engine = CreateEngine();
 
@@ -101,18 +98,16 @@ public sealed class ImpactAnalysisEngineTests
         solution = solution.AddProjectReference(projectB, new ProjectReference(projectA));
 
         solution = solution.AddDocument(
-                DocumentId.CreateNewId(projectA),
-                "Widget.cs",
-                "namespace Alpha; public class Widget { }",
-                filePath: "/repo/src/Alpha/Widget.cs")
-            .Project.Solution;
+            DocumentId.CreateNewId(projectA),
+            "Widget.cs",
+            "namespace Alpha; public class Widget { }",
+            filePath: "/repo/src/Alpha/Widget.cs");
 
         solution = solution.AddDocument(
-                DocumentId.CreateNewId(projectB),
-                "UseWidget.cs",
-                "using Alpha; namespace Beta; public class UseWidget { public Widget Field = new(); }",
-                filePath: "/repo/src/Beta/UseWidget.cs")
-            .Project.Solution;
+            DocumentId.CreateNewId(projectB),
+            "UseWidget.cs",
+            "using Alpha; namespace Beta; public class UseWidget { public Widget Field = new(); }",
+            filePath: "/repo/src/Beta/UseWidget.cs");
 
         return (solution, CreateEngine());
     }
