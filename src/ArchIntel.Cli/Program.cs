@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.CommandLine.Builder;
+using System.CommandLine.Help;
 using System.CommandLine.Invocation;
 using System.CommandLine.Parsing;
 using System.Diagnostics;
@@ -120,7 +121,8 @@ internal static class Program
                 return;
             }
 
-            context.HelpBuilder.Write(root);
+            var helpContext = new HelpContext(context.ParseResult.CommandResult.Command, context.Console);
+            context.HelpBuilder.Write(helpContext);
         }, versionOption);
 
         var parser = new CommandLineBuilder(root)

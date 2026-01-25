@@ -1,6 +1,7 @@
 using ArchIntel.Analysis;
 using ArchIntel.Configuration;
 using ArchIntel.Reports;
+using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
