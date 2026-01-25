@@ -1,6 +1,6 @@
 # ArchIntel
 
-**Local-first, architecture-aware analysis for large .NET solutions.** ArchIntel runs entirely on your machine against cloned repositories. It is designed for enterprise teams that need deterministic, scalable architecture insights without uploading source code anywhere.
+**Local first, architecture aware analysis for large .NET solutions.** ArchIntel runs entirely on your machine against cloned repositories. It is designed for enterprise teams that need deterministic, scalable architecture insights without uploading source code anywhere.
 
 ## What this is
 - A .NET 8 CLI (`arch`) that inspects solution structure and produces machine-readable reports.
