@@ -18,6 +18,28 @@ public sealed class ReportWriter
         var outputDirectory = context.OutputDir;
         Directory.CreateDirectory(outputDirectory);
 
+        if (string.Equals(reportKind, "project_graph", StringComparison.OrdinalIgnoreCase))
+        {
+            var graphData = ProjectGraphReport.Create(context);
+            var baseFileName = "project_graph";
+
+            if (format is ReportFormat.Json or ReportFormat.Both)
+            {
+                var jsonPath = Path.Combine(outputDirectory, $"{baseFileName}.json");
+                var json = JsonSerializer.Serialize(graphData, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(jsonPath, json, cancellationToken);
+            }
+
+            if (format is ReportFormat.Markdown or ReportFormat.Both)
+            {
+                var mdPath = Path.Combine(outputDirectory, $"{baseFileName}.md");
+                var markdown = ProjectGraphReport.BuildMarkdown(graphData);
+                await File.WriteAllTextAsync(mdPath, markdown, cancellationToken);
+            }
+
+            return;
+        }
+
         var data = ReportData.Create(context, reportKind, symbol);
         var baseFileName = reportKind.ToLowerInvariant();
 
