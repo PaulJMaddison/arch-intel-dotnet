@@ -12,13 +12,15 @@ public sealed class AnalysisContext
         string repoRootPath,
         Solution solution,
         AnalysisConfig config,
-        ILogger logger)
+        ILogger logger,
+        PipelineTimer? pipelineTimer = null)
     {
         SolutionPath = Path.GetFullPath(solutionPath);
         RepoRootPath = Path.GetFullPath(repoRootPath);
         Solution = solution;
         Config = config;
         Logger = logger;
+        PipelineTimer = pipelineTimer;
 
         OutputDir = Paths.GetReportsDirectory(RepoRootPath, config.OutputDir);
         CacheDir = Paths.GetCacheDirectory(RepoRootPath, config.CacheDir);
@@ -35,4 +37,5 @@ public sealed class AnalysisContext
     public ILogger Logger { get; }
     public AnalysisConfig Config { get; }
     public int MaxDegreeOfParallelism { get; }
+    public PipelineTimer? PipelineTimer { get; }
 }

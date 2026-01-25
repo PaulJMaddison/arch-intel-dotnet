@@ -124,9 +124,17 @@ internal static class Program
     {
         var config = AnalysisConfig.Load(configPath);
         var mergedConfig = MergeConfig(config, output);
+        var pipelineTimer = new PipelineTimer();
         var solutionLoader = new SolutionLoader(logger);
-        var loadResult = await solutionLoader.LoadAsync(solution, CancellationToken.None);
-        var context = new AnalysisContext(loadResult.SolutionPath, loadResult.RepoRootPath, loadResult.Solution, mergedConfig, logger);
+        var loadResult = await pipelineTimer.TimeLoadSolutionAsync(
+            () => solutionLoader.LoadAsync(solution, CancellationToken.None));
+        var context = new AnalysisContext(
+            loadResult.SolutionPath,
+            loadResult.RepoRootPath,
+            loadResult.Solution,
+            mergedConfig,
+            logger,
+            pipelineTimer);
         var reportFormat = ParseFormat(format);
 
         SafeLog.Info(logger, "Generating {ReportKind} report for {Solution}.", reportKind, SafeLog.SanitizePath(solution));
