@@ -6,5 +6,13 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
     <LangVersion>latest</LangVersion>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <Authors>ArchIntel</Authors>
+    <RepositoryUrl>https://github.com/arch-intel/arch-intel-dotnet</RepositoryUrl>
+    <PackageLicenseExpression>AGPL-3.0-only</PackageLicenseExpression>
+    <Description>Local-first architecture intelligence for .NET solutions.</Description>
+    <PackageTags>architecture;analysis;dotnet;roslyn</PackageTags>
   </PropertyGroup>
 </Project>
