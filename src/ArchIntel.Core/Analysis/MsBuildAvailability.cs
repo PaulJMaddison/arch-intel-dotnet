@@ -14,7 +14,8 @@ public static class MsBuildAvailability
 
         try
         {
-            if (MSBuildLocator.QueryVisualStudioInstances().Any())
+            var instances = MSBuildLocator.QueryVisualStudioInstances().ToArray();
+            if (instances.Any(instance => HasSdkDirectory(instance.MSBuildPath)))
             {
                 return true;
             }
@@ -31,6 +32,17 @@ public static class MsBuildAvailability
         }
 
         var sdkPath = Path.Combine(dotnetRoot, "sdk");
+        return Directory.Exists(sdkPath) && Directory.EnumerateDirectories(sdkPath).Any();
+    }
+
+    private static bool HasSdkDirectory(string? msBuildPath)
+    {
+        if (string.IsNullOrWhiteSpace(msBuildPath))
+        {
+            return false;
+        }
+
+        var sdkPath = Path.Combine(msBuildPath, "Sdks");
         return Directory.Exists(sdkPath) && Directory.EnumerateDirectories(sdkPath).Any();
     }
 
