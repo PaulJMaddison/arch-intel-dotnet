@@ -1,11 +1,11 @@
-using System.CommandLine;
-using System.CommandLine.Builder;
-using System.CommandLine.Help;
-using System.CommandLine.Invocation;
 using ArchIntel.Analysis;
 using ArchIntel.Logging;
 using ArchIntel.Reports;
 using Microsoft.Extensions.Logging;
+using System.CommandLine;
+using System.CommandLine.Builder;
+using System.CommandLine.Invocation;
+using System.CommandLine.Parsing;
 
 namespace ArchIntel;
 
@@ -184,26 +184,17 @@ internal static class Program
             violationsCommand
         };
 
+        // Global options apply to all subcommands.
         root.AddGlobalOption(openOption);
 
-        root.SetHandler(static (InvocationContext context) =>
-        {
-            var helpContext = new HelpContext(
-                context.HelpBuilder,
-                context.ParseResult.CommandResult.Command,
-                Console.Out,
-                context.ParseResult);
-            context.HelpBuilder.Write(helpContext);
-        });
-
         var parser = new CommandLineBuilder(root)
-            .UseDefaults()
+            .UseDefaults() // includes --help, --version, and standard middleware
             .Build();
 
         try
         {
-            // Use the root command's InvokeAsync extension method instead of parser.InvokeAsync
-            return await root.InvokeAsync(args);
+            // IMPORTANT: invoke the parser we built with UseDefaults(), to avoid duplicate middleware/options.
+            return await parser.InvokeAsync(args);
         }
         catch (Exception ex)
         {
