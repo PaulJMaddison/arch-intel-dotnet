@@ -1,6 +1,7 @@
 using ArchIntel.Analysis;
 using ArchIntel.Configuration;
 using ArchIntel.Reports;
+using Microsoft.Build.Locator;
 using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -12,11 +13,14 @@ public sealed class ScanIntegrationTests
     [SkippableFact]
     public async Task ScanReport_IsDeterministic()
     {
-        Skip.IfNot(MsBuildAvailability.IsAvailable(), "MSBuild SDKs were not found; skipping integration test.");
+        Skip.IfNot(
+            MSBuildLocator.QueryVisualStudioInstances().Any(),
+            "MSBuild SDKs were not found; skipping integration test.");
         using var temp = new TemporaryDirectory();
         var solutionPath = GetTestSolutionPath();
         var loader = new SolutionLoader(NullLogger.Instance);
         var loadResult = await loader.LoadAsync(solutionPath, false, false, CancellationToken.None);
+        Assert.True(loadResult.ProjectCount > 0);
 
         var outputDir = Path.Combine(temp.Path, "output");
         var cacheDir = Path.Combine(temp.Path, "cache");
@@ -57,6 +61,8 @@ public sealed class ScanIntegrationTests
                 MaxDegreeOfParallelism = 1
             },
             NullLogger.Instance,
+            solution.Projects.Count(),
+            0,
             loadDiagnostics: new[]
             {
                 new LoadDiagnostic("Failure", "NU1605 Detected package downgrade.", false)
@@ -90,6 +96,8 @@ public sealed class ScanIntegrationTests
             solution,
             config,
             NullLogger.Instance,
+            solution.Projects.Count(),
+            loadDiagnostics.Count(diagnostic => diagnostic.IsFatal),
             loadDiagnostics: loadDiagnostics);
 
         var writer = new ReportWriter();

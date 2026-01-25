@@ -15,4 +15,6 @@ public sealed record SolutionLoadResult(
     string SolutionPath,
     string RepoRootPath,
     Solution Solution,
-    IReadOnlyList<LoadDiagnostic> LoadDiagnostics);
+    IReadOnlyList<LoadDiagnostic> LoadDiagnostics,
+    int ProjectCount,
+    int FailedProjectCount);

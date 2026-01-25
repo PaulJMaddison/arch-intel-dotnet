@@ -62,7 +62,9 @@ public sealed class ArchitecturePassportGeneratorTests
             "/repo",
             solution,
             new AnalysisConfig { MaxDegreeOfParallelism = 1 },
-            NullLogger.Instance);
+            NullLogger.Instance,
+            solution.Projects.Count(),
+            0);
 
         var generator = new ArchitecturePassportGenerator(new PhysicalFileSystem(), new InMemoryCacheStore());
         return await generator.BuildAsync(context, CancellationToken.None);
