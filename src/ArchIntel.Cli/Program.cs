@@ -118,7 +118,7 @@ internal static class Program
             {
                 var version = typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown";
                 Console.WriteLine($"arch {version}");
-                return;
+                return Task.CompletedTask;
             }
 
             var helpContext = new HelpContext(
@@ -127,6 +127,7 @@ internal static class Program
                 Console.Out,
                 context.ParseResult);
             context.HelpBuilder.Write(helpContext);
+            return Task.CompletedTask;
         }, versionOption);
 
         var parser = new CommandLineBuilder(root)
