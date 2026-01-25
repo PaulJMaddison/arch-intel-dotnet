@@ -10,17 +10,17 @@
 ## Who it’s for
 - Architects and platform teams enforcing guardrails across large solutions.
 - Engineering leads who need scalable, repeatable insights in CI.
-- Security- and privacy-conscious teams that cannot upload source code.
+- Security and privacy conscious teams that cannot upload source code.
 
 ## What makes it different
 - **Local-first by default.** Runs on cloned repos with zero external dependencies.
 - **Deterministic outputs.** Stable report formats that can be diffed in CI.
-- **Scalable execution.** Bounded parallelism and incremental-friendly caching directories.
+- **Scalable execution.** Bounded parallelism and incremental friendly caching directories.
 - **No source exposure.** Logging never dumps source code.
 
 ## What it is not
-- A hosted SaaS or cloud-only analyzer.
-- A background daemon or always-on service.
+- A hosted SaaS or cloud only analyzer.
+- A background daemon or always on service.
 - A replacement for full static analysis suites.
 
 ## Zero-infra / local-first design
