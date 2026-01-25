@@ -22,7 +22,7 @@
 - A replacement for full static analysis suites.
 
 ## Zero-infra / local-first design
-ArchIntel is intentionally simple: no network calls, no databases, and no background services. All state is stored in `./.archintel/` within your repo clone for easy cleanup and deterministic output. .
+ArchIntel is intentionally simple: no network calls, no databases, and no background services. All state is stored in `./.archintel/` within your repo clone for easy cleanup and deterministic output.
 
 ## Quickstart
 ```bash
@@ -39,7 +39,7 @@ arch impact --solution ./MySolution.sln --symbol My.Namespace.Type --format json
 arch scan --solution ./MySolution.sln --open
 ```
 
-By default, reports are written to `./.archintel` alongside the solution you are analysing.
+By default, reports are written to `./.archintel` alongside the solution.
 
 ## Docs
 - [Getting started](docs/getting-started.md)

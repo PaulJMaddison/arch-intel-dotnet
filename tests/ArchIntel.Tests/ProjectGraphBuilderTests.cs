@@ -18,9 +18,14 @@ public sealed class ProjectGraphBuilderTests
 
         var nodesByName = graph.Nodes.ToDictionary(node => node.Name, StringComparer.Ordinal);
         Assert.Contains(graph.Edges, edge => edge.FromId == nodesByName["App"].Id && edge.ToId == nodesByName["Lib"].Id);
-        Assert.Equal(
-            graph.Nodes.Select(node => node.Id).OrderBy(id => id, StringComparer.Ordinal),
-            graph.Nodes.Select(node => node.Id));
+        var expectedOrder = graph.Nodes
+            .OrderBy(node => node.Path, StringComparer.Ordinal)
+            .ThenBy(node => node.Name, StringComparer.Ordinal)
+            .ThenBy(node => node.Id, StringComparer.Ordinal)
+            .Select(node => node.Id)
+            .ToArray();
+
+        Assert.Equal(expectedOrder, graph.Nodes.Select(node => node.Id));
     }
 
     [Fact]

@@ -6,7 +6,7 @@ ArchIntel is designed to be local-first by default:
 - No network calls are made.
 - Logs avoid source code content.
 
-Reports are written to `./.archintel` at the root of the solution you are analysing and are intended to be high level summaries suitable for sharing internally.
+Reports are written to `./.archintel` and are intended to be high-level summaries suitable for sharing internally.
 
 ## Reporting a vulnerability
 Please report security issues privately by emailing **security@example.com**. Include:
