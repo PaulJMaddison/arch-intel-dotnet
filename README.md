@@ -53,9 +53,30 @@ ArchIntel reads configuration from `./.archtool/config.json` by default, or from
   "excludeGlobs": ["**/bin/**", "**/obj/**"],
   "outputDir": "./.archtool/reports",
   "cacheDir": "./.archtool/cache",
-  "maxDegreeOfParallelism": 8
+  "maxDegreeOfParallelism": 8,
+  "strict": {
+    "failOnLoadIssues": true,
+    "failOnViolations": true
+  }
 }
 ```
+
+## CI / strict mode
+Use `--strict` in CI to turn load issues and architecture violations into non-zero exit codes while still writing reports.
+
+```bash
+# Strict mode for CI (fails on load issues or violations)
+arch scan --solution ./MySolution.sln --strict
+
+# Strict mode violations report
+arch violations --solution ./MySolution.sln --strict
+```
+
+Exit codes:
+- `0`: analysis completed (default mode may still include non-fatal load issues).
+- `1`: fatal load failure (solution could not be opened, 0 projects loaded, SDK missing).
+- `2`: strict mode gates tripped (load issues and/or architecture violations).
+- `3`: unexpected crash (unhandled exception).
 
 ## Works without AI. Optional AI guidance.
 ArchIntel works entirely without AI. If you choose to integrate AI guidance, that is optional and must be configured outside of the core tool. The open-source CLI never uploads source code by default.

@@ -60,7 +60,7 @@ public sealed class ScanIntegrationTests
             });
 
         var writer = new ReportWriter();
-        await writer.WriteAsync(context, "scan", null, ReportFormat.Json, CancellationToken.None);
+        _ = await writer.WriteAsync(context, "scan", null, ReportFormat.Json, CancellationToken.None);
 
         var summaryPath = Path.Combine(outputDir, "scan_summary.json");
         var summaryJson = File.ReadAllText(summaryPath);
@@ -90,7 +90,7 @@ public sealed class ScanIntegrationTests
             loadDiagnostics: loadDiagnostics);
 
         var writer = new ReportWriter();
-        await writer.WriteAsync(context, "scan", null, ReportFormat.Json, CancellationToken.None);
+        _ = await writer.WriteAsync(context, "scan", null, ReportFormat.Json, CancellationToken.None);
 
         return ReadOutputs(outputDir);
     }
