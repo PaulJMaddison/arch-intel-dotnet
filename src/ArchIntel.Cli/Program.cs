@@ -111,7 +111,9 @@ internal static class Program
     {
         var config = AnalysisConfig.Load(configPath);
         var mergedConfig = MergeConfig(config, output);
-        var context = new AnalysisContext(solution, mergedConfig);
+        var solutionLoader = new SolutionLoader(logger);
+        var loadResult = await solutionLoader.LoadAsync(solution, CancellationToken.None);
+        var context = new AnalysisContext(loadResult.SolutionPath, loadResult.RepoRootPath, loadResult.Solution, mergedConfig, logger);
         var reportFormat = ParseFormat(format);
 
         SafeLog.Info(logger, "Generating {ReportKind} report for {Solution}.", reportKind, SafeLog.SanitizePath(solution));
@@ -119,7 +121,7 @@ internal static class Program
         var writer = new ReportWriter();
         await writer.WriteAsync(context, reportKind, symbol, reportFormat, CancellationToken.None);
 
-        SafeLog.Info(logger, "Report written to {OutputDir}.", SafeLog.SanitizePath(context.OutputDirectory));
+        SafeLog.Info(logger, "Report written to {OutputDir}.", SafeLog.SanitizePath(context.OutputDir));
     }
 
     private static AnalysisConfig MergeConfig(AnalysisConfig config, string? output)

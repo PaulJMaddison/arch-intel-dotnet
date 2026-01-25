@@ -15,7 +15,7 @@ public sealed class ReportWriter
 {
     public async Task WriteAsync(AnalysisContext context, string reportKind, string? symbol, ReportFormat format, CancellationToken cancellationToken)
     {
-        var outputDirectory = context.OutputDirectory;
+        var outputDirectory = context.OutputDir;
         Directory.CreateDirectory(outputDirectory);
 
         var data = ReportData.Create(context, reportKind, symbol);
