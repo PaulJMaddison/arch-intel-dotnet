@@ -124,7 +124,7 @@ internal static class Program
             var helpContext = new HelpContext(
                 context.HelpBuilder,
                 context.ParseResult.CommandResult.Command,
-                context.Console.Out,
+                Console.Out,
                 context.ParseResult);
             context.HelpBuilder.Write(helpContext);
         }, versionOption);
