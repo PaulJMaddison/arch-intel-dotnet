@@ -27,16 +27,30 @@ public sealed class ProjectGraphBuilderTests
     public void Build_DetectsCycles()
     {
         var workspace = new AdhocWorkspace();
-        var solution = workspace.CurrentSolution;
+        var solutionId = SolutionId.CreateNewId();
 
         var projectA = ProjectId.CreateNewId();
         var projectB = ProjectId.CreateNewId();
 
-        solution = solution.AddProject(ProjectInfo.Create(projectA, VersionStamp.Create(), "Alpha", "Alpha", LanguageNames.CSharp, filePath: "/repo/src/Alpha/Alpha.csproj"));
-        solution = solution.AddProject(ProjectInfo.Create(projectB, VersionStamp.Create(), "Beta", "Beta", LanguageNames.CSharp, filePath: "/repo/src/Beta/Beta.csproj"));
+        var projectInfoA = ProjectInfo.Create(
+            projectA,
+            VersionStamp.Create(),
+            "Alpha",
+            "Alpha",
+            LanguageNames.CSharp,
+            filePath: "/repo/src/Alpha/Alpha.csproj",
+            projectReferences: [new ProjectReference(projectB)]);
+        var projectInfoB = ProjectInfo.Create(
+            projectB,
+            VersionStamp.Create(),
+            "Beta",
+            "Beta",
+            LanguageNames.CSharp,
+            filePath: "/repo/src/Beta/Beta.csproj",
+            projectReferences: [new ProjectReference(projectA)]);
 
-        solution = solution.AddProjectReference(projectA, new ProjectReference(projectB));
-        solution = solution.AddProjectReference(projectB, new ProjectReference(projectA));
+        var solution = workspace.AddSolution(
+            SolutionInfo.Create(solutionId, VersionStamp.Create(), projects: [projectInfoA, projectInfoB]));
 
         var graph = ProjectGraphBuilder.Build(solution, "/repo");
 

@@ -87,6 +87,21 @@ public sealed class ImpactAnalysisEngine
             return ImpactAnalysisResult.NotFound(symbolName, suggestions);
         }
 
+        var definitionLocations = matchingSymbols
+            .SelectMany(symbol => symbol.Locations)
+            .Where(location => location.IsInSource)
+            .Select(location => new
+            {
+                FilePath = location.SourceTree?.FilePath,
+                LineSpan = location.GetLineSpan().StartLinePosition
+            })
+            .Where(location => !string.IsNullOrWhiteSpace(location.FilePath))
+            .Select(location => (
+                FilePath: Path.GetFullPath(location.FilePath!),
+                Line: location.LineSpan.Line + 1,
+                Column: location.LineSpan.Character + 1))
+            .ToHashSet();
+
         var referenceLocations = new List<ReferenceLocationInfo>();
 
         foreach (var symbol in matchingSymbols)
@@ -109,26 +124,37 @@ public sealed class ImpactAnalysisEngine
                     }
 
                     var lineSpan = location.Location.GetLineSpan();
-                    referenceLocations.Add(new ReferenceLocationInfo(
+                    var reference = new ReferenceLocationInfo(
                         document.Project.Name,
                         Path.GetFullPath(filePath),
                         lineSpan.StartLinePosition.Line + 1,
-                        lineSpan.StartLinePosition.Character + 1));
+                        lineSpan.StartLinePosition.Character + 1);
+
+                    if (definitionLocations.Contains((reference.FilePath, reference.Line, reference.Column)))
+                    {
+                        continue;
+                    }
+
+                    referenceLocations.Add(reference);
                 }
             }
         }
 
-        var impactedProjects = referenceLocations
+        var distinctReferences = referenceLocations
+            .Distinct()
+            .ToArray();
+
+        var impactedProjects = distinctReferences
             .Select(reference => reference.ProjectName)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(project => project, StringComparer.Ordinal)
             .ToArray();
-        var impactedFiles = referenceLocations
+        var impactedFiles = distinctReferences
             .Select(reference => reference.FilePath)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToArray();
-        var totalReferences = referenceLocations.Count;
+        var totalReferences = impactedFiles.Length;
 
         var definitionLocation = matchingSymbols
             .SelectMany(symbol => symbol.Locations)
