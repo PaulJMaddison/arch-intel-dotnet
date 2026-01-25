@@ -9,6 +9,9 @@ namespace ArchIntel.Analysis;
 public sealed class SolutionLoader : ISolutionLoader
 {
     private readonly ILogger _logger;
+    private static readonly StringComparer PathComparer = OperatingSystem.IsWindows()
+        ? StringComparer.OrdinalIgnoreCase
+        : StringComparer.Ordinal;
 
     public SolutionLoader(ILogger logger)
     {
@@ -55,7 +58,7 @@ public sealed class SolutionLoader : ISolutionLoader
                 ex);
         }
 
-        return BuildLoadResult(solutionPath, repoRootPath, solution, diagnostics, failOnLoadIssues);
+        return BuildLoadResult(solutionPath, repoRootPath, solution, diagnostics);
     }
 
     internal static string ResolveSolutionPath(string solutionPathOrDirectory)
@@ -130,7 +133,7 @@ public sealed class SolutionLoader : ISolutionLoader
         }
     }
 
-    private static void EnsureMsBuildRegistered()
+    private void EnsureMsBuildRegistered()
     {
         if (MSBuildLocator.IsRegistered)
         {
@@ -155,25 +158,29 @@ public sealed class SolutionLoader : ISolutionLoader
                 "MSBuild could not be registered. Verify the .NET SDK installation.",
                 ex);
         }
+
+        SafeLog.Info(
+            _logger,
+            "Using MSBuild {Version} at {Path}.",
+            instance.Version,
+            instance.MSBuildPath);
     }
 
     internal static SolutionLoadResult BuildLoadResult(
         string solutionPath,
         string repoRootPath,
         Solution solution,
-        IReadOnlyList<WorkspaceDiagnostic> diagnostics,
-        bool failOnLoadIssues)
+        IReadOnlyList<WorkspaceDiagnostic> diagnostics)
     {
-        if (!solution.Projects.Any())
-        {
-            throw new SolutionLoadException("MSBuild loaded the solution, but it contains no projects.");
-        }
+        var projectCount = solution.Projects.Count();
+        var failedProjectCount = CalculateFailedProjectCount(solution, diagnostics);
 
         var loadDiagnostics = diagnostics
             .Select(diagnostic =>
             {
                 var isFatal = IsFatalWorkspaceDiagnostic(diagnostic);
-                return new LoadDiagnostic(diagnostic.Kind.ToString(), diagnostic.Message, isFatal);
+                var message = SanitizeDiagnosticMessage(diagnostic.Message);
+                return new LoadDiagnostic(diagnostic.Kind.ToString(), message, isFatal);
             })
             .OrderBy(diagnostic => diagnostic.Kind, StringComparer.Ordinal)
             .ThenBy(diagnostic => diagnostic.Message, StringComparer.Ordinal)
@@ -181,17 +188,7 @@ public sealed class SolutionLoader : ISolutionLoader
             .ToList()
             .AsReadOnly();
 
-        if (failOnLoadIssues)
-        {
-            var fatal = loadDiagnostics.FirstOrDefault(diagnostic => diagnostic.IsFatal);
-            if (fatal is not null)
-            {
-                throw new SolutionLoadException(
-                    $"MSBuild reported a fatal load issue: {SafeLog.SanitizeValue(fatal.Message)}");
-            }
-        }
-
-        return new SolutionLoadResult(solutionPath, repoRootPath, solution, loadDiagnostics);
+        return new SolutionLoadResult(solutionPath, repoRootPath, solution, loadDiagnostics, projectCount, failedProjectCount);
     }
 
     internal static bool IsFatalWorkspaceDiagnostic(WorkspaceDiagnostic diagnostic)
@@ -246,6 +243,127 @@ public sealed class SolutionLoader : ISolutionLoader
         }
 
         return false;
+    }
+
+    internal static string SanitizeDiagnosticMessage(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return string.Empty;
+        }
+
+        var sanitized = message.ReplaceLineEndings(" ").Trim();
+        sanitized = System.Text.RegularExpressions.Regex.Replace(
+            sanitized,
+            "[A-Za-z]:\\\\Users\\\\[^\\\\/\\s]+",
+            "<userdir>");
+        sanitized = System.Text.RegularExpressions.Regex.Replace(
+            sanitized,
+            "/(Users|home)/[^/\\s]+",
+            "<userdir>");
+        sanitized = System.Text.RegularExpressions.Regex.Replace(
+            sanitized,
+            "(^|[\\s\"'\\(=])([A-Za-z]:\\\\[^\\s\"']+)",
+            match => $"{match.Groups[1].Value}<path>");
+        sanitized = System.Text.RegularExpressions.Regex.Replace(
+            sanitized,
+            "(^|[\\s\"'\\(=])(/[^\\s\"']+)",
+            match => $"{match.Groups[1].Value}<path>");
+        return sanitized;
+    }
+
+    private static int CalculateFailedProjectCount(Solution solution, IReadOnlyList<WorkspaceDiagnostic> diagnostics)
+    {
+        var projectPaths = solution.Projects
+            .Select(project => project.FilePath)
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path => Path.GetFullPath(path!))
+            .ToHashSet(PathComparer);
+
+        var fileNameLookup = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in projectPaths)
+        {
+            var fileName = Path.GetFileName(path);
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                continue;
+            }
+
+            if (!fileNameLookup.TryGetValue(fileName, out var list))
+            {
+                list = new List<string>();
+                fileNameLookup[fileName] = list;
+            }
+
+            list.Add(path);
+        }
+
+        var failedProjects = new HashSet<string>(PathComparer);
+        var fatalUnmapped = 0;
+
+        foreach (var diagnostic in diagnostics)
+        {
+            if (!IsFatalWorkspaceDiagnostic(diagnostic))
+            {
+                continue;
+            }
+
+            var mapped = false;
+            foreach (var candidate in ExtractProjectPaths(diagnostic.Message))
+            {
+                var normalized = candidate;
+                if (Path.IsPathRooted(candidate))
+                {
+                    normalized = Path.GetFullPath(candidate);
+                }
+
+                if (projectPaths.Contains(normalized))
+                {
+                    failedProjects.Add(normalized);
+                    mapped = true;
+                    continue;
+                }
+
+                var fileName = Path.GetFileName(candidate);
+                if (!string.IsNullOrWhiteSpace(fileName)
+                    && fileNameLookup.TryGetValue(fileName, out var matches)
+                    && matches.Count == 1)
+                {
+                    failedProjects.Add(matches[0]);
+                    mapped = true;
+                }
+            }
+
+            if (!mapped)
+            {
+                fatalUnmapped += 1;
+            }
+        }
+
+        return failedProjects.Count + fatalUnmapped;
+    }
+
+    private static IEnumerable<string> ExtractProjectPaths(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            yield break;
+        }
+
+        var candidates = System.Text.RegularExpressions.Regex.Matches(
+            message,
+            "([A-Za-z]:\\\\[^\\s\"']+\\.(csproj|vbproj|fsproj))|(/[^\\s\"']+\\.(csproj|vbproj|fsproj))|(\\b[^\\s\"']+\\.(csproj|vbproj|fsproj))",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        foreach (System.Text.RegularExpressions.Match match in candidates)
+        {
+            if (!match.Success)
+            {
+                continue;
+            }
+
+            yield return match.Value;
+        }
     }
 
     private sealed record SolutionCandidate(string Path, int ProjectCount);

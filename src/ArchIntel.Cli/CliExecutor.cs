@@ -51,6 +51,8 @@ internal static class CliExecutor
                 loadResult.Solution,
                 mergedConfig,
                 logger,
+                loadResult.ProjectCount,
+                loadResult.FailedProjectCount,
                 pipelineTimer: pipelineTimer,
                 loadDiagnostics: loadResult.LoadDiagnostics);
 
@@ -69,9 +71,11 @@ internal static class CliExecutor
                 logger,
                 reportKind,
                 loadResult.LoadDiagnostics,
+                loadResult.ProjectCount,
                 reportOutcome,
                 strict,
-                strictSettings);
+                strictSettings,
+                failOnLoadIssuesEffective);
         }
         catch (SolutionLoadException ex)
         {
@@ -93,28 +97,47 @@ internal static class CliExecutor
         ILogger logger,
         string reportKind,
         IReadOnlyList<LoadDiagnostic> loadDiagnostics,
+        int projectCount,
         ReportOutcome reportOutcome,
         bool strict,
-        StrictSettings strictSettings)
+        StrictSettings strictSettings,
+        bool failOnLoadIssues)
     {
         var loadIssueCount = loadDiagnostics.Count;
+        var fatalLoadIssueCount = loadDiagnostics.Count(diagnostic => diagnostic.IsFatal);
         var violationCount = reportOutcome.ViolationCount ?? 0;
+
+        if (projectCount == 0)
+        {
+            SafeLog.Error(
+                logger,
+                "No projects were loaded from the solution. Verify the solution builds locally and try again.");
+            return ExitCodes.FatalLoadFailure;
+        }
 
         if (strict)
         {
-            var gatedLoadIssues = strictSettings.FailOnLoadIssues ? loadIssueCount : 0;
             var gatedViolations = strictSettings.FailOnViolations ? violationCount : 0;
-            if (gatedLoadIssues > 0 || gatedViolations > 0)
+            if (fatalLoadIssueCount > 0 || gatedViolations > 0)
             {
                 SafeLog.Warn(
                     logger,
-                "STRICT MODE: failing due to {LoadIssueCount} load issues and {ViolationCount} violations. See scan_summary.json.",
-                gatedLoadIssues,
-                gatedViolations);
+                    "STRICT MODE: failing due to {LoadIssueCount} fatal load issues and {ViolationCount} violations. See scan_summary.json.",
+                    fatalLoadIssueCount,
+                    gatedViolations);
                 return ExitCodes.StrictModeFailure;
             }
 
             return ExitCodes.Success;
+        }
+
+        if (failOnLoadIssues && fatalLoadIssueCount > 0)
+        {
+            SafeLog.Warn(
+                logger,
+                "Failing due to {Count} fatal load issues (see scan_summary.json).",
+                fatalLoadIssueCount);
+            return ExitCodes.FatalLoadFailure;
         }
 
         if (loadIssueCount > 0)

@@ -28,6 +28,14 @@ ArchIntel always writes reports, even if MSBuild returns non-fatal load issues. 
 
 You can also set strict defaults in `.archintel/config.json` via the `strict` block.
 
+## scan_summary.json fields
+`scan_summary.json` includes a `Counts` block with the following fields:
+- **ProjectCount:** number of projects in the loaded solution (`Solution.Projects.Count`).
+- **FailedProjectCount:** best-effort count of projects that failed to load. If a fatal diagnostic cannot be mapped to a specific project, it is still counted as a failure.
+- **AnalyzedDocuments:** number of documents actually processed by the scanner (after exclusions).
+
+`ProjectCount` can be `0` when MSBuild is unable to load any projects (for example, missing SDKs or workloads). In that case, ArchIntel exits with a non-zero code even in default mode.
+
 ## Common solution load issues
 - **"MSBuild SDKs were not found"**: install the .NET SDK or Visual Studio Build Tools.
 - **"The SDK 'Microsoft.NET.Sdk' specified could not be found"**: verify your `global.json` and SDK installation.

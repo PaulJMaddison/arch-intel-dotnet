@@ -39,7 +39,37 @@ public sealed class CliExitCodeTests
     }
 
     [Fact]
-    public async Task StrictMode_ExitsTwo_WhenLoadDiagnosticsExist()
+    public async Task StrictMode_ExitsTwo_WhenFatalLoadDiagnosticsExist()
+    {
+        var loadResult = CreateLoadResult(new[]
+        {
+            new LoadDiagnostic("Failure", "The SDK 'Microsoft.NET.Sdk' specified could not be found.", true)
+        });
+        var loader = new FakeSolutionLoader(_ => Task.FromResult(loadResult));
+        var writer = new FakeReportWriter((_, _, _, _, _) => Task.FromResult(new ReportOutcome(null)));
+
+        var exitCode = await CliExecutor.RunReportAsync(
+            NullLogger.Instance,
+            loader,
+            writer,
+            "test.sln",
+            null,
+            null,
+            null,
+            null,
+            true,
+            false,
+            "scan",
+            null,
+            false,
+            CancellationToken.None);
+
+        Assert.Equal(ExitCodes.StrictModeFailure, exitCode);
+        Assert.True(writer.WasCalled);
+    }
+
+    [Fact]
+    public async Task StrictMode_ExitsZero_WhenOnlyNonFatalLoadDiagnosticsExist()
     {
         var loadResult = CreateLoadResult(new[]
         {
@@ -64,7 +94,7 @@ public sealed class CliExitCodeTests
             false,
             CancellationToken.None);
 
-        Assert.Equal(ExitCodes.StrictModeFailure, exitCode);
+        Assert.Equal(ExitCodes.Success, exitCode);
         Assert.True(writer.WasCalled);
     }
 
@@ -148,11 +178,68 @@ public sealed class CliExitCodeTests
         Assert.True(writer.WasCalled);
     }
 
+    [Fact]
+    public async Task DefaultMode_ExitsOne_WhenFailOnLoadIssuesAndFatalDiagnosticsExist()
+    {
+        var loadResult = CreateLoadResult(new[]
+        {
+            new LoadDiagnostic("Failure", "The SDK 'Microsoft.NET.Sdk' specified could not be found.", true)
+        });
+        var loader = new FakeSolutionLoader(_ => Task.FromResult(loadResult));
+        var writer = new FakeReportWriter((_, _, _, _, _) => Task.FromResult(new ReportOutcome(null)));
+
+        var exitCode = await CliExecutor.RunReportAsync(
+            NullLogger.Instance,
+            loader,
+            writer,
+            "test.sln",
+            null,
+            null,
+            null,
+            true,
+            false,
+            false,
+            "scan",
+            null,
+            false,
+            CancellationToken.None);
+
+        Assert.Equal(ExitCodes.FatalLoadFailure, exitCode);
+        Assert.True(writer.WasCalled);
+    }
+
+    [Fact]
+    public async Task DefaultMode_ExitsOne_WhenNoProjectsLoaded()
+    {
+        var loadResult = CreateLoadResult(Array.Empty<LoadDiagnostic>()) with { ProjectCount = 0 };
+        var loader = new FakeSolutionLoader(_ => Task.FromResult(loadResult));
+        var writer = new FakeReportWriter((_, _, _, _, _) => Task.FromResult(new ReportOutcome(null)));
+
+        var exitCode = await CliExecutor.RunReportAsync(
+            NullLogger.Instance,
+            loader,
+            writer,
+            "test.sln",
+            null,
+            null,
+            null,
+            null,
+            false,
+            false,
+            "scan",
+            null,
+            false,
+            CancellationToken.None);
+
+        Assert.Equal(ExitCodes.FatalLoadFailure, exitCode);
+        Assert.True(writer.WasCalled);
+    }
+
     private static SolutionLoadResult CreateLoadResult(IReadOnlyList<LoadDiagnostic> diagnostics)
     {
         using var workspace = new AdhocWorkspace();
         var solution = workspace.CurrentSolution.AddProject("Test", "Test", LanguageNames.CSharp).Solution;
-        return new SolutionLoadResult("test.sln", "repo", solution, diagnostics);
+        return new SolutionLoadResult("test.sln", "repo", solution, diagnostics, solution.Projects.Count(), 0);
     }
 
     private sealed class FakeSolutionLoader : ISolutionLoader

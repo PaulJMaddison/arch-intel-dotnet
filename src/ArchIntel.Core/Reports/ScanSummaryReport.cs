@@ -32,9 +32,13 @@ public static class ScanSummaryReport
             ? await scanner.ScanAsync(context, cancellationToken)
             : await context.PipelineTimer.TimeIndexSymbolsAsync(() => scanner.ScanAsync(context, cancellationToken));
 
+        var counts = new ScanCounts(
+            context.ProjectCount,
+            context.FailedProjectCount,
+            scanData.AnalyzedDocuments);
         var timing = context.PipelineTimer?.ToTiming() ?? new PipelineTiming(0, 0, 0, 0);
         return new ScanSummaryReportData(
-            scanData.Counts,
+            counts,
             scanData.CacheHits,
             scanData.CacheMisses,
             timing,

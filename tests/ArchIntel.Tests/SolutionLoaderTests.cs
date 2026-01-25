@@ -65,7 +65,7 @@ public sealed class SolutionLoaderTests
     }
 
     [Fact]
-    public void BuildLoadResult_WhenNonFatalDiagnosticsAndFailOnLoadIssues_DoesNotThrow()
+    public void BuildLoadResult_WhenNonFatalDiagnostics_DoesNotThrow()
     {
         using var workspace = new AdhocWorkspace();
         var project = workspace.CurrentSolution.AddProject("Test", "Test", LanguageNames.CSharp);
@@ -79,11 +79,52 @@ public sealed class SolutionLoaderTests
             solutionPath: "test.sln",
             repoRootPath: "repo",
             solution: solution,
-            diagnostics: diagnostics,
-            failOnLoadIssues: true);
+            diagnostics: diagnostics);
 
         Assert.Single(result.LoadDiagnostics);
         Assert.False(result.LoadDiagnostics[0].IsFatal);
+    }
+
+    [Fact]
+    public void BuildLoadResult_SortsDiagnosticsDeterministically()
+    {
+        using var workspace = new AdhocWorkspace();
+        var project = workspace.CurrentSolution.AddProject("Test", "Test", LanguageNames.CSharp);
+        var solution = project.Solution;
+        var diagnostics = new[]
+        {
+            CreateDiagnostic(WorkspaceDiagnosticKind.Warning, "Zulu warning"),
+            CreateDiagnostic(WorkspaceDiagnosticKind.Failure, "Alpha failure"),
+            CreateDiagnostic(WorkspaceDiagnosticKind.Failure, "Bravo failure")
+        };
+
+        var result = SolutionLoader.BuildLoadResult(
+            solutionPath: "test.sln",
+            repoRootPath: "repo",
+            solution: solution,
+            diagnostics: diagnostics);
+
+        Assert.Equal("Failure", result.LoadDiagnostics[0].Kind);
+        Assert.Equal("Alpha failure", result.LoadDiagnostics[0].Message);
+        Assert.Equal("Failure", result.LoadDiagnostics[1].Kind);
+        Assert.Equal("Bravo failure", result.LoadDiagnostics[1].Message);
+        Assert.Equal("Warning", result.LoadDiagnostics[2].Kind);
+        Assert.Equal("Zulu warning", result.LoadDiagnostics[2].Message);
+    }
+
+    [Fact]
+    public void SanitizeDiagnosticMessage_RemovesAbsolutePaths()
+    {
+        var message = "Failed to load C:\\Users\\Alice\\repo\\App\\App.csproj and /home/bob/repo/Lib/Lib.csproj. " +
+                      "MSBuild is at D:\\BuildTools\\MSBuild\\Current.";
+
+        var sanitized = SolutionLoader.SanitizeDiagnosticMessage(message);
+
+        Assert.DoesNotContain("C:\\Users\\Alice", sanitized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("/home/bob", sanitized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("D:\\BuildTools", sanitized, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<userdir>", sanitized, StringComparison.Ordinal);
+        Assert.Contains("<path>", sanitized, StringComparison.Ordinal);
     }
 
     private static WorkspaceDiagnostic CreateDiagnostic(WorkspaceDiagnosticKind kind, string message)

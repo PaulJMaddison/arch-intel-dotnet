@@ -14,6 +14,8 @@ public sealed class AnalysisContext
         Solution solution,
         AnalysisConfig config,
         ILogger logger,
+        int projectCount,
+        int failedProjectCount,
         PipelineTimer? pipelineTimer = null,
         IReadOnlyList<LoadDiagnostic>? loadDiagnostics = null)
     {
@@ -22,6 +24,8 @@ public sealed class AnalysisContext
         Solution = solution;
         Config = config;
         Logger = logger;
+        ProjectCount = projectCount;
+        FailedProjectCount = failedProjectCount;
         PipelineTimer = pipelineTimer;
         LoadDiagnostics = loadDiagnostics ?? Array.Empty<LoadDiagnostic>();
 
@@ -36,6 +40,8 @@ public sealed class AnalysisContext
     public string OutputDir { get; }
     public string CacheDir { get; }
     public Solution Solution { get; }
+    public int ProjectCount { get; }
+    public int FailedProjectCount { get; }
     public string AnalysisVersion { get; }
     public ILogger Logger { get; }
     public AnalysisConfig Config { get; }

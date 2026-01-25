@@ -105,7 +105,9 @@ public sealed class ArchitectureRulesEngineTests
             "/repo",
             solution,
             config,
-            logger);
+            logger,
+            solution.Projects.Count(),
+            0);
     }
 
     private static Solution CreateSolution(Action<SolutionBuilder> configure)

@@ -23,8 +23,6 @@ public sealed class SolutionScanner
 
     public async Task<ScanSummaryData> ScanAsync(AnalysisContext context, CancellationToken cancellationToken)
     {
-        var total = 0;
-        var excluded = 0;
         var analyzed = 0;
         var hits = 0;
         var misses = 0;
@@ -46,10 +44,8 @@ public sealed class SolutionScanner
                 return;
             }
 
-            Interlocked.Increment(ref total);
             if (_filter.IsExcluded(document.FilePath))
             {
-                Interlocked.Increment(ref excluded);
                 return;
             }
 
@@ -74,11 +70,11 @@ public sealed class SolutionScanner
         });
 
         return new ScanSummaryData(
-            new ScanCounts(total, excluded, analyzed),
+            analyzed,
             hits,
             misses);
     }
 }
 
-public sealed record ScanCounts(int TotalDocuments, int ExcludedDocuments, int AnalyzedDocuments);
-public sealed record ScanSummaryData(ScanCounts Counts, int CacheHits, int CacheMisses);
+public sealed record ScanCounts(int ProjectCount, int FailedProjectCount, int AnalyzedDocuments);
+public sealed record ScanSummaryData(int AnalyzedDocuments, int CacheHits, int CacheMisses);
