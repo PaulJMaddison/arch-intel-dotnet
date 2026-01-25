@@ -39,6 +39,9 @@ internal static class Program
             "--fail-on-load-issues",
             "Fail if MSBuild reports fatal load issues.");
         var strictOption = new Option<bool>("--strict", "Enable strict mode (CI-grade exit codes).");
+        var includeDocSnippetsOption = new Option<bool>(
+            "--include-doc-snippets",
+            "Include the first 2000 characters of documentation files in docs.json outputs.");
         var symbolOption = new Option<string>("--symbol")
         {
             IsRequired = true,
@@ -52,7 +55,8 @@ internal static class Program
             configOption,
             formatOption,
             failOnLoadIssuesOption,
-            strictOption
+            strictOption,
+            includeDocSnippetsOption
         };
         async Task RunReportAsync(string reportKind, InvocationContext context)
         {
@@ -62,6 +66,7 @@ internal static class Program
             var format = context.ParseResult.GetValueForOption(formatOption);
             var failOnLoadIssues = context.ParseResult.GetValueForOption(failOnLoadIssuesOption);
             var strict = context.ParseResult.GetValueForOption(strictOption);
+            var includeDocSnippets = context.ParseResult.GetValueForOption(includeDocSnippetsOption);
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
             var openOutput = context.ParseResult.GetValueForOption(openOption);
             var symbol = string.Equals(reportKind, "impact", StringComparison.OrdinalIgnoreCase)
@@ -78,6 +83,7 @@ internal static class Program
                 format,
                 failOnLoadIssues,
                 strict,
+                includeDocSnippets,
                 verbose,
                 reportKind,
                 symbol,
@@ -94,7 +100,8 @@ internal static class Program
             configOption,
             formatOption,
             failOnLoadIssuesOption,
-            strictOption
+            strictOption,
+            includeDocSnippetsOption
         };
         passportCommand.SetHandler(async context => await RunReportAsync("passport", context));
 
@@ -106,7 +113,8 @@ internal static class Program
             configOption,
             formatOption,
             failOnLoadIssuesOption,
-            strictOption
+            strictOption,
+            includeDocSnippetsOption
         };
         impactCommand.SetHandler(async context => await RunReportAsync("impact", context));
 
@@ -117,7 +125,8 @@ internal static class Program
             configOption,
             formatOption,
             failOnLoadIssuesOption,
-            strictOption
+            strictOption,
+            includeDocSnippetsOption
         };
         projectGraphCommand.SetHandler(async context => await RunReportAsync("project_graph", context));
 
@@ -128,7 +137,8 @@ internal static class Program
             configOption,
             formatOption,
             failOnLoadIssuesOption,
-            strictOption
+            strictOption,
+            includeDocSnippetsOption
         };
         violationsCommand.SetHandler(async context => await RunReportAsync("violations", context));
 

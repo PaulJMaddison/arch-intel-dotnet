@@ -190,6 +190,8 @@ public sealed class ReportWriter : IReportWriter
         string outputDirectory,
         CancellationToken cancellationToken)
     {
+        await DocumentationCaptureReport.WriteAsync(context, _fileSystem, outputDirectory, cancellationToken);
+
         if (!string.Equals(reportKind, "scan", StringComparison.OrdinalIgnoreCase))
         {
             await ScanReceiptReport.WriteAsync(context, _fileSystem, outputDirectory, cancellationToken);
