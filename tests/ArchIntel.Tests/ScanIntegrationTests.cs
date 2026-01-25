@@ -9,9 +9,10 @@ namespace ArchIntel.Tests;
 
 public sealed class ScanIntegrationTests
 {
-    [Fact]
+    [SkippableFact]
     public async Task ScanReport_IsDeterministic()
     {
+        Skip.IfNot(MsBuildAvailability.IsAvailable(), "MSBuild SDKs were not found; skipping integration test.");
         using var temp = new TemporaryDirectory();
         var solutionPath = GetTestSolutionPath();
         var loader = new SolutionLoader(NullLogger.Instance);
