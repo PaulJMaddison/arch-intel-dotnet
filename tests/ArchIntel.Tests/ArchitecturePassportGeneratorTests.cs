@@ -31,25 +31,22 @@ public sealed class ArchitecturePassportGeneratorTests
         solution = solution.AddProject(ProjectInfo.Create(projectId, VersionStamp.Create(), "MyApp.Api", "MyApp.Api", LanguageNames.CSharp, filePath: "/repo/src/MyApp.Api/MyApp.Api.csproj"));
 
         solution = solution.AddDocument(
-                DocumentId.CreateNewId(projectId),
-                "Controllers.cs",
-                @"namespace MyApp.Controllers; public class OrdersController { }",
-                filePath: "/repo/src/MyApp.Api/Controllers.cs")
-            .Project.Solution;
+            DocumentId.CreateNewId(projectId),
+            "Controllers.cs",
+            @"namespace MyApp.Controllers; public class OrdersController { }",
+            filePath: "/repo/src/MyApp.Api/Controllers.cs");
 
         solution = solution.AddDocument(
-                DocumentId.CreateNewId(projectId),
-                "Data.cs",
-                @"namespace MyApp.Data; public class AppDbContext { }",
-                filePath: "/repo/src/MyApp.Api/Data.cs")
-            .Project.Solution;
+            DocumentId.CreateNewId(projectId),
+            "Data.cs",
+            @"namespace MyApp.Data; public class AppDbContext { }",
+            filePath: "/repo/src/MyApp.Api/Data.cs");
 
         solution = solution.AddDocument(
-                DocumentId.CreateNewId(projectId),
-                "Logging.cs",
-                @"namespace Serilog; public class Logger { }",
-                filePath: "/repo/src/MyApp.Api/Logging.cs")
-            .Project.Solution;
+            DocumentId.CreateNewId(projectId),
+            "Logging.cs",
+            @"namespace Serilog; public class Logger { }",
+            filePath: "/repo/src/MyApp.Api/Logging.cs");
 
         var output = await BuildPassportAsync(solution);
 
@@ -84,18 +81,16 @@ public sealed class ArchitecturePassportGeneratorTests
         solution = solution.AddProjectReference(appId, new ProjectReference(dataId));
 
         solution = solution.AddDocument(
-                DocumentId.CreateNewId(appId),
-                "Startup.cs",
-                @"namespace App.Api; public class Startup { public void ConfigureServices() { } }",
-                filePath: "/repo/src/App.Api/Startup.cs")
-            .Project.Solution;
+            DocumentId.CreateNewId(appId),
+            "Startup.cs",
+            @"namespace App.Api; public class Startup { public void ConfigureServices() { } }",
+            filePath: "/repo/src/App.Api/Startup.cs");
 
         solution = solution.AddDocument(
-                DocumentId.CreateNewId(dataId),
-                "Context.cs",
-                @"namespace App.Data; public class AppDbContext { }",
-                filePath: "/repo/src/App.Data/Context.cs")
-            .Project.Solution;
+            DocumentId.CreateNewId(dataId),
+            "Context.cs",
+            @"namespace App.Data; public class AppDbContext { }",
+            filePath: "/repo/src/App.Data/Context.cs");
 
         return solution;
     }

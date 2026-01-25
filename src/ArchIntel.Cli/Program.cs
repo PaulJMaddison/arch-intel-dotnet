@@ -121,7 +121,11 @@ internal static class Program
                 return;
             }
 
-            var helpContext = new HelpContext(context.ParseResult.CommandResult.Command, context.Console);
+            var helpContext = new HelpContext(
+                context.HelpBuilder,
+                context.ParseResult.CommandResult.Command,
+                context.Console.Out,
+                context.ParseResult);
             context.HelpBuilder.Write(helpContext);
         }, versionOption);
 
