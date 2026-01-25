@@ -8,7 +8,8 @@ public sealed record ScanSummaryReportData(
     ScanCounts Counts,
     int CacheHits,
     int CacheMisses,
-    PipelineTiming Durations);
+    PipelineTiming Durations,
+    IReadOnlyList<LoadDiagnostic> LoadDiagnostics);
 
 public static class ScanSummaryReport
 {
@@ -32,7 +33,12 @@ public static class ScanSummaryReport
             : await context.PipelineTimer.TimeIndexSymbolsAsync(() => scanner.ScanAsync(context, cancellationToken));
 
         var timing = context.PipelineTimer?.ToTiming() ?? new PipelineTiming(0, 0, 0, 0);
-        return new ScanSummaryReportData(scanData.Counts, scanData.CacheHits, scanData.CacheMisses, timing);
+        return new ScanSummaryReportData(
+            scanData.Counts,
+            scanData.CacheHits,
+            scanData.CacheMisses,
+            timing,
+            context.LoadDiagnostics);
     }
 
     public static async Task WriteAsync(

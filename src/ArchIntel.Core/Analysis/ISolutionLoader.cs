@@ -4,7 +4,14 @@ namespace ArchIntel.Analysis;
 
 public interface ISolutionLoader
 {
-    Task<SolutionLoadResult> LoadAsync(string solutionPathOrDirectory, CancellationToken cancellationToken);
+    Task<SolutionLoadResult> LoadAsync(
+        string solutionPathOrDirectory,
+        bool failOnLoadIssues,
+        CancellationToken cancellationToken);
 }
 
-public sealed record SolutionLoadResult(string SolutionPath, string RepoRootPath, Solution Solution);
+public sealed record SolutionLoadResult(
+    string SolutionPath,
+    string RepoRootPath,
+    Solution Solution,
+    IReadOnlyList<LoadDiagnostic> LoadDiagnostics);

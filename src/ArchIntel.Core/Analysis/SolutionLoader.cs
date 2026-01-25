@@ -15,7 +15,10 @@ public sealed class SolutionLoader : ISolutionLoader
         _logger = logger;
     }
 
-    public async Task<SolutionLoadResult> LoadAsync(string solutionPathOrDirectory, CancellationToken cancellationToken)
+    public async Task<SolutionLoadResult> LoadAsync(
+        string solutionPathOrDirectory,
+        bool failOnLoadIssues,
+        CancellationToken cancellationToken)
     {
         var solutionPath = ResolveSolutionPath(solutionPathOrDirectory);
         var repoRootPath = ResolveRepoRootPath(solutionPath);
@@ -48,14 +51,7 @@ public sealed class SolutionLoader : ISolutionLoader
                 ex);
         }
 
-        var failure = diagnostics.FirstOrDefault(diagnostic => diagnostic.Kind == WorkspaceDiagnosticKind.Failure);
-        if (failure is not null)
-        {
-            throw new SolutionLoadException(
-                $"MSBuild reported a failure while loading the solution: {SafeLog.SanitizeValue(failure.Message)}");
-        }
-
-        return new SolutionLoadResult(solutionPath, repoRootPath, solution);
+        return BuildLoadResult(solutionPath, repoRootPath, solution, diagnostics, failOnLoadIssues);
     }
 
     internal static string ResolveSolutionPath(string solutionPathOrDirectory)
@@ -159,6 +155,94 @@ public sealed class SolutionLoader : ISolutionLoader
                 "MSBuild could not be registered. Verify the .NET SDK installation.",
                 ex);
         }
+    }
+
+    internal static SolutionLoadResult BuildLoadResult(
+        string solutionPath,
+        string repoRootPath,
+        Solution solution,
+        IReadOnlyList<WorkspaceDiagnostic> diagnostics,
+        bool failOnLoadIssues)
+    {
+        if (!solution.Projects.Any())
+        {
+            throw new SolutionLoadException("MSBuild loaded the solution, but it contains no projects.");
+        }
+
+        var loadDiagnostics = diagnostics
+            .Select(diagnostic =>
+            {
+                var isFatal = IsFatalWorkspaceDiagnostic(diagnostic);
+                return new LoadDiagnostic(diagnostic.Kind.ToString(), diagnostic.Message, isFatal);
+            })
+            .ToList()
+            .AsReadOnly();
+
+        if (failOnLoadIssues)
+        {
+            var fatal = loadDiagnostics.FirstOrDefault(diagnostic => diagnostic.IsFatal);
+            if (fatal is not null)
+            {
+                throw new SolutionLoadException(
+                    $"MSBuild reported a fatal load issue: {SafeLog.SanitizeValue(fatal.Message)}");
+            }
+        }
+
+        return new SolutionLoadResult(solutionPath, repoRootPath, solution, loadDiagnostics);
+    }
+
+    internal static bool IsFatalWorkspaceDiagnostic(WorkspaceDiagnostic diagnostic)
+    {
+        var message = diagnostic.Message ?? string.Empty;
+        var normalized = message.Trim();
+
+        if (ContainsAny(normalized, "depends on", "was not found", "was resolved", "nuget")
+            || System.Text.RegularExpressions.Regex.IsMatch(normalized, "\\bNU\\d+", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+        {
+            return false;
+        }
+
+        if (normalized.Contains("The SDK 'Microsoft.NET.Sdk' specified could not be found", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (normalized.Contains("MSBuild SDKs were not found", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (normalized.Contains("could not be found", StringComparison.OrdinalIgnoreCase)
+            && normalized.Contains("sdk", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (normalized.Contains("Unable to load project file", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (normalized.Contains("error MSB", StringComparison.OrdinalIgnoreCase)
+            || System.Text.RegularExpressions.Regex.IsMatch(normalized, "\\bMSB\\d+", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool ContainsAny(string value, params string[] candidates)
+    {
+        foreach (var candidate in candidates)
+        {
+            if (value.Contains(candidate, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private sealed record SolutionCandidate(string Path, int ProjectCount);

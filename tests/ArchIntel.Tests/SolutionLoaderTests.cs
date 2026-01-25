@@ -1,4 +1,5 @@
 using ArchIntel.Analysis;
+using Microsoft.CodeAnalysis;
 using Xunit;
 
 namespace ArchIntel.Tests;
@@ -37,6 +38,67 @@ public sealed class SolutionLoaderTests
         var exception = Assert.Throws<SolutionLoadException>(() => SolutionLoader.ResolveSolutionPath(missingPath));
 
         Assert.Contains("does not exist", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void IsFatalWorkspaceDiagnostic_WhenNuGetMessage_ReturnsFalse()
+    {
+        var diagnostic = CreateDiagnostic(
+            WorkspaceDiagnosticKind.Failure,
+            "NU1605 Detected package downgrade: Example depends on Something");
+
+        var isFatal = SolutionLoader.IsFatalWorkspaceDiagnostic(diagnostic);
+
+        Assert.False(isFatal);
+    }
+
+    [Fact]
+    public void IsFatalWorkspaceDiagnostic_WhenSdkMissing_ReturnsTrue()
+    {
+        var diagnostic = CreateDiagnostic(
+            WorkspaceDiagnosticKind.Failure,
+            "The SDK 'Microsoft.NET.Sdk' specified could not be found.");
+
+        var isFatal = SolutionLoader.IsFatalWorkspaceDiagnostic(diagnostic);
+
+        Assert.True(isFatal);
+    }
+
+    [Fact]
+    public void BuildLoadResult_WhenNonFatalDiagnosticsAndFailOnLoadIssues_DoesNotThrow()
+    {
+        using var workspace = new AdhocWorkspace();
+        var solution = workspace.CurrentSolution.AddProject("Test", "Test", LanguageNames.CSharp);
+        var diagnostics = new[]
+        {
+            CreateDiagnostic(WorkspaceDiagnosticKind.Failure, "NU1202 The package was resolved.")
+        };
+
+        var result = SolutionLoader.BuildLoadResult(
+            solutionPath: "test.sln",
+            repoRootPath: "repo",
+            solution: solution,
+            diagnostics: diagnostics,
+            failOnLoadIssues: true);
+
+        Assert.Single(result.LoadDiagnostics);
+        Assert.False(result.LoadDiagnostics[0].IsFatal);
+    }
+
+    private static WorkspaceDiagnostic CreateDiagnostic(WorkspaceDiagnosticKind kind, string message)
+    {
+        var constructor = typeof(WorkspaceDiagnostic).GetConstructor(
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic,
+            binder: null,
+            types: new[] { typeof(WorkspaceDiagnosticKind), typeof(string) },
+            modifiers: null);
+
+        if (constructor is null)
+        {
+            throw new InvalidOperationException("Unable to locate WorkspaceDiagnostic constructor.");
+        }
+
+        return (WorkspaceDiagnostic)constructor.Invoke(new object[] { kind, message });
     }
 
     private sealed class TemporaryDirectory : IDisposable
