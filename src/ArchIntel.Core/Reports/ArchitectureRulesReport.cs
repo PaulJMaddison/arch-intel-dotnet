@@ -21,7 +21,6 @@ public static class ArchitectureRulesReport
         builder.AppendLine();
         builder.AppendLine($"- Solution: {data.SolutionPath}");
         builder.AppendLine($"- Analysis version: {data.AnalysisVersion}");
-        builder.AppendLine($"- Generated at (UTC): {data.GeneratedAtUtc:O}");
         builder.AppendLine($"- Violations: {data.Violations.Count}");
         builder.AppendLine();
 

@@ -161,6 +161,7 @@ public sealed class ReportWriter
         builder.AppendLine($"# {data.Kind} report");
         builder.AppendLine();
         builder.AppendLine($"- Solution: {data.SolutionPath}");
+        builder.AppendLine($"- Analysis version: {data.AnalysisVersion}");
         builder.AppendLine($"- MaxDegreeOfParallelism: {data.MaxDegreeOfParallelism}");
         if (!string.IsNullOrWhiteSpace(data.Symbol))
         {
@@ -185,6 +186,7 @@ public sealed class ReportWriter
     private sealed record ReportData(
         string Kind,
         string SolutionPath,
+        string AnalysisVersion,
         string? Symbol,
         int MaxDegreeOfParallelism,
         IReadOnlyList<string> IncludeGlobs,
@@ -198,6 +200,7 @@ public sealed class ReportWriter
             return new ReportData(
                 kind,
                 context.SolutionPath,
+                context.AnalysisVersion,
                 symbol,
                 context.MaxDegreeOfParallelism,
                 include,

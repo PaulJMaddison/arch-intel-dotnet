@@ -21,7 +21,7 @@ public sealed class SolutionLoaderTests
     {
         using var temp = new TemporaryDirectory();
         var smaller = temp.CreateSolution("alpha.sln", 1);
-        var larger = temp.CreateSolution("beta.sln", 3);
+        var larger = temp.CreateSolution("gamma.sln", 3);
 
         var resolved = SolutionLoader.ResolveSolutionPath(temp.Path);
 

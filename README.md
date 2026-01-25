@@ -1,30 +1,25 @@
 # ArchIntel
 
-**Local first, architecture aware analysis for large .NET solutions.** ArchIntel runs entirely on your machine against cloned repositories. It is designed for enterprise teams that need deterministic, scalable architecture insights without uploading source code anywhere.
+**Local-first architecture intelligence for large .NET solutions.** ArchIntel is a .NET 8 CLI (`arch`) that runs entirely on your machine, producing deterministic reports without sending source code anywhere.
 
-## What this is
-- A .NET 8 CLI (`arch`) that inspects solution structure and produces machine-readable reports.
-- Built for large, multi-project solutions with deterministic outputs suitable for CI diffing.
-- Designed for local-first operation: no network calls, no databases, no background services.
+## Why ArchIntel
+- **Local-first.** Runs against cloned repositories with zero external dependencies.
+- **Architecture intelligence.** Produces structured insights about projects, layers, dependencies, and drift.
+- **Zero infra.** No servers, no databases, no background services; just run the CLI.
+- **Deterministic outputs.** Stable report formats suitable for CI diffing and enforcement.
 
 ## Who it’s for
 - Architects and platform teams enforcing guardrails across large solutions.
-- Engineering leads who need scalable, repeatable insights in CI.
-- Security and privacy conscious teams that cannot upload source code.
-
-## What makes it different
-- **Local-first by default.** Runs on cloned repos with zero external dependencies.
-- **Deterministic outputs.** Stable report formats that can be diffed in CI.
-- **Scalable execution.** Bounded parallelism and incremental friendly caching directories.
-- **No source exposure.** Logging never dumps source code.
+- Engineering leads who need repeatable insights in CI and local workflows.
+- Security and privacy-conscious teams that keep source code on-device.
 
 ## What it is not
-- A hosted SaaS or cloud only analyzer.
-- A background daemon or always on service.
+- A hosted SaaS or cloud-only analyzer.
+- A background daemon or always-on service.
 - A replacement for full static analysis suites.
 
 ## Zero-infra / local-first design
-ArchIntel is intentionally simple: no network calls, no database, and no background services. All state is stored in `./.archtool/` within your repo clone for easy cleanup and deterministic output.
+ArchIntel is intentionally simple: no network calls, no databases, and no background services. All state is stored in `./.archtool/` within your repo clone for easy cleanup and deterministic output.
 
 ## Quickstart
 ```bash
@@ -36,6 +31,9 @@ arch passport --solution ./MySolution.sln --format both
 
 # Impact analysis for a symbol
 arch impact --solution ./MySolution.sln --symbol My.Namespace.Type --format json
+
+# Open the output directory after completion
+arch scan --solution ./MySolution.sln --open
 ```
 
 ### Config file

@@ -76,6 +76,7 @@ public sealed class ArchitecturePassportGenerator
 
         builder.AppendLine("## Overview");
         builder.AppendLine($"- Solution: {context.SolutionPath}");
+        builder.AppendLine($"- Analysis version: {context.AnalysisVersion}");
         builder.AppendLine($"- Projects: {graph.Nodes.Count}");
         builder.AppendLine($"- Dependencies: {graph.Edges.Count}");
         builder.AppendLine($"- Cycles: {graph.Cycles.Count}");

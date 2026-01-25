@@ -6,6 +6,7 @@ namespace ArchIntel.Reports;
 
 public sealed record ImpactAnalysisReportData(
     string SolutionPath,
+    string AnalysisVersion,
     string Symbol,
     bool Found,
     ImpactDefinitionLocation? DefinitionLocation,
@@ -31,6 +32,7 @@ public static class ImpactAnalysisReport
 
         return new ImpactAnalysisReportData(
             context.SolutionPath,
+            context.AnalysisVersion,
             result.Symbol,
             result.Found,
             result.DefinitionLocation,
@@ -46,6 +48,7 @@ public static class ImpactAnalysisReport
         builder.AppendLine("# Impact analysis report");
         builder.AppendLine();
         builder.AppendLine($"- Solution: {data.SolutionPath}");
+        builder.AppendLine($"- Analysis version: {data.AnalysisVersion}");
         builder.AppendLine($"- Symbol: {data.Symbol}");
         builder.AppendLine($"- Found: {(data.Found ? "Yes" : "No")}");
         builder.AppendLine($"- Total references: {data.TotalReferences}");
