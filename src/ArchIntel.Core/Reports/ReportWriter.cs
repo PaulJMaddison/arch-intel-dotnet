@@ -93,6 +93,7 @@ public sealed class ReportWriter
         if (string.Equals(reportKind, "scan", StringComparison.OrdinalIgnoreCase))
         {
             await ScanSummaryReport.WriteAsync(context, _fileSystem, outputDirectory, cancellationToken);
+            await SymbolIndexReport.WriteAsync(context, _fileSystem, outputDirectory, cancellationToken);
         }
     }
 
