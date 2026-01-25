@@ -2,6 +2,7 @@ using System.CommandLine;
 using System.CommandLine.Builder;
 using System.CommandLine.Invocation;
 using System.CommandLine.Parsing;
+using System.Diagnostics;
 using ArchIntel.Analysis;
 using ArchIntel.Configuration;
 using ArchIntel.Logging;
@@ -29,6 +30,7 @@ internal static class Program
         var outputOption = new Option<string?>("--out", "Output directory for reports.");
         var configOption = new Option<string?>("--config", "Path to the analysis config JSON file.");
         var formatOption = new Option<string?>("--format", "Report format: json, md, or both.");
+        var openOption = new Option<bool>("--open", "Open the report output directory after completion.");
         var symbolOption = new Option<string>("--symbol")
         {
             IsRequired = true,
@@ -42,10 +44,10 @@ internal static class Program
             configOption,
             formatOption
         };
-        scanCommand.SetHandler(async (solution, output, configPath, format) =>
+        scanCommand.SetHandler(async (solution, output, configPath, format, openOutput) =>
         {
-            await RunReportAsync(logger, solution, output, configPath, format, "scan", null);
-        }, solutionOption, outputOption, configOption, formatOption);
+            await RunReportAsync(logger, solution, output, configPath, format, "scan", null, openOutput);
+        }, solutionOption, outputOption, configOption, formatOption, openOption);
 
         var passportCommand = new Command("passport", "Generate an architecture passport.")
         {
@@ -54,10 +56,10 @@ internal static class Program
             configOption,
             formatOption
         };
-        passportCommand.SetHandler(async (solution, output, configPath, format) =>
+        passportCommand.SetHandler(async (solution, output, configPath, format, openOutput) =>
         {
-            await RunReportAsync(logger, solution, output, configPath, format, "passport", null);
-        }, solutionOption, outputOption, configOption, formatOption);
+            await RunReportAsync(logger, solution, output, configPath, format, "passport", null, openOutput);
+        }, solutionOption, outputOption, configOption, formatOption, openOption);
 
         var impactCommand = new Command("impact", "Analyze impact for a specific symbol.")
         {
@@ -67,10 +69,10 @@ internal static class Program
             configOption,
             formatOption
         };
-        impactCommand.SetHandler(async (solution, symbol, output, configPath, format) =>
+        impactCommand.SetHandler(async (solution, symbol, output, configPath, format, openOutput) =>
         {
-            await RunReportAsync(logger, solution, output, configPath, format, "impact", symbol);
-        }, solutionOption, symbolOption, outputOption, configOption, formatOption);
+            await RunReportAsync(logger, solution, output, configPath, format, "impact", symbol, openOutput);
+        }, solutionOption, symbolOption, outputOption, configOption, formatOption, openOption);
 
         var projectGraphCommand = new Command("project-graph", "Generate a project dependency graph.")
         {
@@ -79,10 +81,10 @@ internal static class Program
             configOption,
             formatOption
         };
-        projectGraphCommand.SetHandler(async (solution, output, configPath, format) =>
+        projectGraphCommand.SetHandler(async (solution, output, configPath, format, openOutput) =>
         {
-            await RunReportAsync(logger, solution, output, configPath, format, "project_graph", null);
-        }, solutionOption, outputOption, configOption, formatOption);
+            await RunReportAsync(logger, solution, output, configPath, format, "project_graph", null, openOutput);
+        }, solutionOption, outputOption, configOption, formatOption, openOption);
 
         var violationsCommand = new Command("violations", "Check architecture rules and drift.")
         {
@@ -91,10 +93,10 @@ internal static class Program
             configOption,
             formatOption
         };
-        violationsCommand.SetHandler(async (solution, output, configPath, format) =>
+        violationsCommand.SetHandler(async (solution, output, configPath, format, openOutput) =>
         {
-            await RunReportAsync(logger, solution, output, configPath, format, "violations", null);
-        }, solutionOption, outputOption, configOption, formatOption);
+            await RunReportAsync(logger, solution, output, configPath, format, "violations", null, openOutput);
+        }, solutionOption, outputOption, configOption, formatOption, openOption);
 
         var root = new RootCommand("ArchIntel CLI")
         {
@@ -104,6 +106,8 @@ internal static class Program
             projectGraphCommand,
             violationsCommand
         };
+
+        root.AddGlobalOption(openOption);
 
         var versionOption = new Option<bool>("--version", "Show version information.");
         root.AddOption(versionOption);
@@ -133,7 +137,8 @@ internal static class Program
         string? configPath,
         string? format,
         string reportKind,
-        string? symbol)
+        string? symbol,
+        bool openOutput)
     {
         var config = AnalysisConfig.Load(configPath);
         var mergedConfig = MergeConfig(config, output);
@@ -167,10 +172,31 @@ internal static class Program
             await writer.WriteAsync(context, reportKind, symbol, reportFormat, cancellationSource.Token);
 
             SafeLog.Info(logger, "Report written to {OutputDir}.", SafeLog.SanitizePath(context.OutputDir));
+
+            if (openOutput)
+            {
+                OpenOutputDirectory(logger, context.OutputDir);
+            }
         }
         finally
         {
             Console.CancelKeyPress -= handler;
+        }
+    }
+
+    private static void OpenOutputDirectory(ILogger logger, string outputDir)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = outputDir,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            SafeLog.Warn(logger, "Unable to open output directory: {Message}", SafeLog.SanitizeValue(ex.Message));
         }
     }
 

@@ -37,7 +37,7 @@ public static class ProjectGraphReport
         builder.AppendLine("# Project graph");
         builder.AppendLine();
         builder.AppendLine($"- Solution: {data.SolutionPath}");
-        builder.AppendLine($"- AnalysisVersion: {data.AnalysisVersion}");
+        builder.AppendLine($"- Analysis version: {data.AnalysisVersion}");
         builder.AppendLine($"- Nodes: {data.Nodes.Count}");
         builder.AppendLine($"- Edges: {data.Edges.Count}");
         builder.AppendLine($"- Cycles: {data.Cycles.Count}");
