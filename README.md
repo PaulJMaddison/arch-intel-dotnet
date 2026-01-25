@@ -55,7 +55,7 @@ ArchIntel reads configuration from `./.archtool/config.json` by default, or from
 ArchIntel works entirely without AI. If you choose to integrate AI guidance, that is optional and must be configured outside of the core tool. The open-source CLI never uploads source code by default.
 
 ## Pro & Enterprise
-We offer commercial licensing for teams that want specialized outcomes: custom architecture policies, private extensions, and enterprise support. This is outcome-based only; no roadmap promises are made in the open-source repo.
+We offer commercial licensing for teams that want specialized outcomes: custom architecture policies, private extensions, and enterprise support. This is outcome based only; no roadmap promises are made in the open source repo.
 
 ## License
 This project is dual-licensed under AGPLv3 and a commercial license. See [LICENSE](LICENSE) and [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md).
