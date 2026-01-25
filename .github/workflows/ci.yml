@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore
+        run: dotnet restore ArchIntel.sln
+      - name: Verify formatting
+        run: dotnet format ArchIntel.sln --verify-no-changes
+      - name: Build (Release)
+        run: dotnet build ArchIntel.sln -c Release --no-restore
+      - name: Test (Release)
+        run: dotnet test ArchIntel.sln -c Release --no-build --logger "trx;LogFileName=test-results.trx" --results-directory ./TestResults
+      - name: Pack (Release)
+        run: |
+          dotnet pack src/ArchIntel.Cli/ArchIntel.Cli.csproj -c Release --no-build -o ./artifacts
+          dotnet pack src/ArchIntel.Core/ArchIntel.Core.csproj -c Release --no-build -o ./artifacts
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/**/*.trx
+      - name: Upload packages
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: artifacts/*.nupkg

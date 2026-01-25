@@ -39,11 +39,12 @@ public static class SafeLog
         }
 
         var trimmed = value.Trim();
-        if (trimmed.Length <= MaxValueLength)
+        var singleLine = trimmed.ReplaceLineEndings(" ").Replace("\r", " ").Replace("\n", " ");
+        if (singleLine.Length <= MaxValueLength)
         {
-            return trimmed;
+            return singleLine;
         }
 
-        return trimmed[..MaxValueLength] + "...";
+        return singleLine[..MaxValueLength] + "...";
     }
 }
