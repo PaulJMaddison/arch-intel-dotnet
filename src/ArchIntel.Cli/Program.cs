@@ -84,12 +84,25 @@ internal static class Program
             await RunReportAsync(logger, solution, output, configPath, format, "project_graph", null);
         }, solutionOption, outputOption, configOption, formatOption);
 
+        var violationsCommand = new Command("violations", "Check architecture rules and drift.")
+        {
+            solutionOption,
+            outputOption,
+            configOption,
+            formatOption
+        };
+        violationsCommand.SetHandler(async (solution, output, configPath, format) =>
+        {
+            await RunReportAsync(logger, solution, output, configPath, format, "violations", null);
+        }, solutionOption, outputOption, configOption, formatOption);
+
         var root = new RootCommand("ArchIntel CLI")
         {
             scanCommand,
             passportCommand,
             impactCommand,
-            projectGraphCommand
+            projectGraphCommand,
+            violationsCommand
         };
 
         var versionOption = new Option<bool>("--version", "Show version information.");
@@ -158,7 +171,8 @@ internal static class Program
             ExcludeGlobs = config.ExcludeGlobs,
             OutputDir = output,
             CacheDir = config.CacheDir,
-            MaxDegreeOfParallelism = config.MaxDegreeOfParallelism
+            MaxDegreeOfParallelism = config.MaxDegreeOfParallelism,
+            ArchitectureRules = config.ArchitectureRules
         };
     }
 

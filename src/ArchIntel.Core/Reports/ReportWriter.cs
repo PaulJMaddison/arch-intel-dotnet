@@ -82,6 +82,28 @@ public sealed class ReportWriter
             return;
         }
 
+        if (string.Equals(reportKind, "violations", StringComparison.OrdinalIgnoreCase))
+        {
+            var rulesData = await ArchitectureRulesReport.CreateAsync(context, cancellationToken);
+            var baseFileName = "violations";
+
+            if (format is ReportFormat.Json or ReportFormat.Both)
+            {
+                var jsonPath = Path.Combine(outputDirectory, $"{baseFileName}.json");
+                var json = JsonSerializer.Serialize(rulesData, new JsonSerializerOptions { WriteIndented = true });
+                await _fileSystem.WriteAllTextAsync(jsonPath, json, cancellationToken);
+            }
+
+            if (format is ReportFormat.Markdown or ReportFormat.Both)
+            {
+                var mdPath = Path.Combine(outputDirectory, $"{baseFileName}.md");
+                var markdown = ArchitectureRulesReport.BuildMarkdown(rulesData);
+                await _fileSystem.WriteAllTextAsync(mdPath, markdown, cancellationToken);
+            }
+
+            return;
+        }
+
         if (string.Equals(reportKind, "impact", StringComparison.OrdinalIgnoreCase))
         {
             if (string.IsNullOrWhiteSpace(symbol))
