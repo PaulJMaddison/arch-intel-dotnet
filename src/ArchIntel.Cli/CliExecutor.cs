@@ -19,6 +19,7 @@ internal static class CliExecutor
         string? format,
         bool? failOnLoadIssues,
         bool strict,
+        bool includeDocSnippets,
         bool verbose,
         string reportKind,
         string? symbol,
@@ -26,7 +27,7 @@ internal static class CliExecutor
         CancellationToken cancellationToken)
     {
         var config = AnalysisConfig.Load(configPath);
-        var mergedConfig = MergeConfig(config, output, failOnLoadIssues, strict);
+        var mergedConfig = MergeConfig(config, output, failOnLoadIssues, strict, includeDocSnippets);
         var strictSettings = ResolveStrictSettings(mergedConfig.Strict, strict);
         var pipelineTimer = new PipelineTimer();
         var reportFormat = ParseFormat(format);
@@ -179,8 +180,14 @@ internal static class CliExecutor
             strictConfig.FailOnViolations ?? true);
     }
 
-    private static AnalysisConfig MergeConfig(AnalysisConfig config, string? output, bool? failOnLoadIssues, bool strict)
+    private static AnalysisConfig MergeConfig(
+        AnalysisConfig config,
+        string? output,
+        bool? failOnLoadIssues,
+        bool strict,
+        bool includeDocSnippets)
     {
+        var includeSnippets = includeDocSnippets || config.IncludeDocSnippets;
         var strictConfig = config.Strict ?? new StrictModeConfig();
         var mergedStrict = strict
             ? new StrictModeConfig
@@ -202,6 +209,7 @@ internal static class CliExecutor
                     CacheDir = config.CacheDir,
                     MaxDegreeOfParallelism = config.MaxDegreeOfParallelism,
                     FailOnLoadIssues = config.FailOnLoadIssues,
+                    IncludeDocSnippets = includeSnippets,
                     Strict = mergedStrict,
                     ArchitectureRules = config.ArchitectureRules
                 };
@@ -215,6 +223,7 @@ internal static class CliExecutor
                 CacheDir = config.CacheDir,
                 MaxDegreeOfParallelism = config.MaxDegreeOfParallelism,
                 FailOnLoadIssues = failOnLoadIssues.Value,
+                IncludeDocSnippets = includeSnippets,
                 Strict = mergedStrict,
                 ArchitectureRules = config.ArchitectureRules
             };
@@ -228,6 +237,7 @@ internal static class CliExecutor
             CacheDir = config.CacheDir,
             MaxDegreeOfParallelism = config.MaxDegreeOfParallelism,
             FailOnLoadIssues = failOnLoadIssues ?? config.FailOnLoadIssues,
+            IncludeDocSnippets = includeSnippets,
             Strict = mergedStrict,
             ArchitectureRules = config.ArchitectureRules
         };
