@@ -110,6 +110,9 @@ Paste scan.md (if generated) for human-readable context.
 
 This allows teams to use AI for interpretation and reasoning without granting AI tools direct access to source code or repositories. The open-source CLI never uploads source code or connects to external services.
 
+## Library / NuGet note: 
+v0.1 focuses on the CLI and report artifacts. NuGet packages may be introduced in a future release to support integrations (e.g., IDE or agent layers). Until then, public compatibility guarantees apply only to the CLI contract and output formats.
+
 ## Pro & Enterprise
 We offer commercial licensing for teams that want access to advanced modules such as architecture governance, performance and scalability analysis, private extensions, and enterprise support. Commercial capabilities are delivered on an outcome basis. No public roadmap commitments are made in the open source repository.
 
