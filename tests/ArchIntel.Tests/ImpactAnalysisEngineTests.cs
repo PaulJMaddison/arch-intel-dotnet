@@ -17,7 +17,7 @@ public sealed class ImpactAnalysisEngineTests
         Assert.True(result.Found);
         Assert.NotNull(result.DefinitionLocation);
         Assert.Contains("Beta", result.ImpactedProjects);
-        Assert.Contains("/repo/src/Beta/UseWidget.cs", result.ImpactedFiles);
+        Assert.Contains(NormalizePath("/repo/src/Beta/UseWidget.cs"), result.ImpactedFiles.Select(NormalizePath));
         Assert.Equal(1, result.TotalReferences);
         Assert.Empty(result.Suggestions);
     }
@@ -79,8 +79,9 @@ public sealed class ImpactAnalysisEngineTests
         Assert.Equal(2, result.TotalReferences);
         Assert.Equal(new[] { "Beta", "Gamma" }, result.ImpactedProjects);
         Assert.Equal(
-            new[] { "/repo/src/Beta/UseService.cs", "/repo/src/Gamma/OtherUseService.cs" },
-            result.ImpactedFiles);
+            new[] { "/repo/src/Beta/UseService.cs", "/repo/src/Gamma/OtherUseService.cs" }.Select(NormalizePath),
+            result.ImpactedFiles.Select(NormalizePath),
+            StringComparer.OrdinalIgnoreCase);
     }
 
     private static (Solution Solution, ImpactAnalysisEngine Engine) CreateSolution()
@@ -123,5 +124,10 @@ public sealed class ImpactAnalysisEngineTests
     private static MetadataReference[] CreateReferences()
     {
         return [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)];
+    }
+
+    private static string NormalizePath(string path)
+    {
+        return Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
     }
 }
