@@ -14,6 +14,8 @@ The symbol index is the global map of types, namespaces, and symbol locations. I
 ### Reports
 Reports are emitted as structured JSON (and optional text) under `./.archintel`. They are designed to be deterministic and diff-friendly for CI enforcement.
 
+Key report outputs include `projects.json`, which captures per-project metadata (stable IDs, target frameworks, output type, and references) along with a dependency graph summary. Test projects are flagged when the project name contains `Test/Tests` or when common test packages (xunit/nunit/mstest) are referenced, if available.
+
 ### Cache
 The cache stores computed document hashes and scan results in `./.archintel/cache` to speed up repeated scans without sacrificing determinism.
 

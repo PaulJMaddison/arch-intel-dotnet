@@ -1,6 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.CodeAnalysis;
 
 namespace ArchIntel.Analysis;
@@ -15,7 +13,7 @@ public static class ProjectGraphBuilder
 
         foreach (var project in projects)
         {
-            var id = CreateStableId(project);
+            var id = ProjectIdentity.CreateStableId(project);
             idMap[project.Id] = id;
 
             var path = GetDisplayPath(project.FilePath, repoRootPath);
@@ -58,18 +56,6 @@ public static class ProjectGraphBuilder
             new ReadOnlyCollection<ProjectNode>(nodes),
             new ReadOnlyCollection<ProjectEdge>(edges),
             new ReadOnlyCollection<IReadOnlyList<string>>(cycles.ToList()));
-    }
-
-    private static string CreateStableId(Project project)
-    {
-        var source = project.FilePath ?? project.Name;
-        var normalized = project.FilePath is null
-            ? source
-            : Path.GetFullPath(source);
-
-        using var sha = SHA256.Create();
-        var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(normalized));
-        return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
     private static string GetDisplayPath(string? filePath, string repoRootPath)

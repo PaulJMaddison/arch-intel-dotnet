@@ -195,6 +195,7 @@ public sealed class ReportWriter : IReportWriter
             await ScanReceiptReport.WriteAsync(context, _fileSystem, outputDirectory, cancellationToken);
         }
 
+        await ProjectsReport.WriteAsync(context, _fileSystem, outputDirectory, cancellationToken);
         await ScanSummaryReport.WriteAsync(context, _fileSystem, outputDirectory, cancellationToken);
         await SymbolIndexReport.WriteAsync(context, _fileSystem, outputDirectory, cancellationToken);
         await OutputReadmeReport.WriteAsync(context, _fileSystem, outputDirectory, cancellationToken);
