@@ -9,7 +9,7 @@ public sealed record SymbolIndexEntry(
     string SymbolId,
     string Kind,
     string Name,
-    string? Namespace,
+    string Namespace,
     string? ContainingType,
     string ProjectName,
     string ProjectId);
@@ -110,16 +110,15 @@ public sealed class SymbolIndex
                 var entry = CreateEntry(symbol, syntaxSymbol, project, symbolId);
                 symbols.Add(entry);
 
-                var namespaceName = entry.Namespace ?? string.Empty;
-                var counterKey = (entry.ProjectId, namespaceName);
-                var counter = namespaceCounters.GetOrAdd(counterKey, _ => new NamespaceCounter(entry.ProjectName, entry.ProjectId, namespaceName));
+                var counterKey = (entry.ProjectId, entry.Namespace);
+                var counter = namespaceCounters.GetOrAdd(counterKey, _ => new NamespaceCounter(entry.ProjectName, entry.ProjectId, entry.Namespace));
                 counter.Increment(entry.Kind);
             }
         });
 
         var symbolList = symbols
             .OrderBy(entry => entry.ProjectName, StringComparer.Ordinal)
-            .ThenBy(entry => entry.Namespace ?? string.Empty, StringComparer.Ordinal)
+            .ThenBy(entry => entry.Namespace, StringComparer.Ordinal)
             .ThenBy(entry => entry.ContainingType ?? string.Empty, StringComparer.Ordinal)
             .ThenBy(entry => entry.Name, StringComparer.Ordinal)
             .ThenBy(entry => entry.Kind, StringComparer.Ordinal)
@@ -164,7 +163,7 @@ public sealed class SymbolIndex
             symbolId,
             syntaxSymbol.Kind.ToString(),
             syntaxSymbol.Name,
-            string.IsNullOrWhiteSpace(syntaxSymbol.Namespace) ? null : syntaxSymbol.Namespace,
+            syntaxSymbol.Namespace,
             string.IsNullOrWhiteSpace(syntaxSymbol.ContainingType) ? null : syntaxSymbol.ContainingType,
             project.Name,
             project.Id.Id.ToString());
@@ -334,6 +333,10 @@ public sealed class SymbolIndex
 
     private static class SymbolIdFactory
     {
+        private static readonly SymbolDisplayFormat NamespaceDisplayFormat = new(
+            globalNamespaceStyle: SymbolDisplayGlobalNamespaceStyle.Omitted,
+            typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces);
+
         public static string Create(ISymbol? symbol, SyntaxSymbol syntaxSymbol, string projectId)
         {
             if (symbol is not null)
@@ -349,11 +352,11 @@ public sealed class SymbolIndex
             return $"{projectId}:{fallback}";
         }
 
-        public static (string? Namespace, string? ContainingType) GetSymbolContainer(ISymbol symbol)
+        public static (string Namespace, string? ContainingType) GetSymbolContainer(ISymbol symbol)
         {
-            var namespaceName = symbol.ContainingNamespace?.IsGlobalNamespace == true
-                ? null
-                : symbol.ContainingNamespace?.ToDisplayString();
+            var namespaceName = symbol.ContainingNamespace is null || symbol.ContainingNamespace.IsGlobalNamespace
+                ? string.Empty
+                : symbol.ContainingNamespace.ToDisplayString(NamespaceDisplayFormat);
             var containingType = GetContainingTypeName(symbol.ContainingType);
             return (namespaceName, containingType);
         }

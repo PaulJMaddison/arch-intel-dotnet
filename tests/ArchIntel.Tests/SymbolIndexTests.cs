@@ -107,6 +107,50 @@ public sealed class SymbolIndexTests
         Assert.Contains(data.Symbols, symbol => symbol.Kind == "PublicMethod" && symbol.Name == "Run");
     }
 
+    [Fact]
+    public async Task BuildAsync_ResolvesNamespacesForNestedFileScopedAndGlobal()
+    {
+        var workspace = new AdhocWorkspace();
+        var solution = workspace.CurrentSolution;
+
+        var projectId = ProjectId.CreateNewId();
+        solution = solution.AddProject(ProjectInfo.Create(projectId, VersionStamp.Create(), "Gamma", "Gamma", LanguageNames.CSharp, filePath: "/repo/src/Gamma/Gamma.csproj"));
+
+        solution = solution.AddDocument(
+            DocumentId.CreateNewId(projectId),
+            "Nested.cs",
+            @"namespace Outer.Inner { public class NestedType { public void Go() { } } }",
+            filePath: "/repo/src/Gamma/Nested.cs");
+
+        solution = solution.AddDocument(
+            DocumentId.CreateNewId(projectId),
+            "FileScoped.cs",
+            @"namespace FileScoped; public class FileScopedType { public void Run() { } }",
+            filePath: "/repo/src/Gamma/FileScoped.cs");
+
+        solution = solution.AddDocument(
+            DocumentId.CreateNewId(projectId),
+            "Global.cs",
+            @"public class GlobalType { public void Ping() { } }",
+            filePath: "/repo/src/Gamma/Global.cs");
+
+        var index = CreateIndex();
+        var data = await index.BuildAsync(solution, "test-version", CancellationToken.None);
+
+        Assert.All(data.Symbols, symbol => Assert.NotNull(symbol.Namespace));
+        Assert.Contains(data.Symbols, symbol => symbol.Name == "NestedType" && symbol.Namespace == "Outer.Inner");
+        Assert.Contains(data.Symbols, symbol => symbol.Name == "Go" && symbol.Namespace == "Outer.Inner");
+        Assert.Contains(data.Symbols, symbol => symbol.Name == "FileScopedType" && symbol.Namespace == "FileScoped");
+        Assert.Contains(data.Symbols, symbol => symbol.Name == "Run" && symbol.Namespace == "FileScoped");
+        Assert.Contains(data.Symbols, symbol => symbol.Name == "GlobalType" && symbol.Namespace == string.Empty);
+        Assert.Contains(data.Symbols, symbol => symbol.Name == "Ping" && symbol.Namespace == string.Empty);
+
+        var namespaces = data.Namespaces.Single(stats => stats.ProjectName == "Gamma").Namespaces;
+        Assert.Contains(namespaces, stat => stat.Name == "Outer.Inner");
+        Assert.Contains(namespaces, stat => stat.Name == "FileScoped");
+        Assert.Contains(namespaces, stat => stat.Name == "(global)");
+    }
+
     private static SymbolIndex CreateIndex()
     {
         var fileSystem = new PhysicalFileSystem();

@@ -309,7 +309,7 @@ public sealed class ArchitecturePassportGenerator
                             string.Equals(entry.Name, "Configure", StringComparison.Ordinal))
             .OrderBy(entry => entry.Name, StringComparer.Ordinal)
             .ThenBy(entry => entry.ContainingType ?? string.Empty, StringComparer.Ordinal)
-            .ThenBy(entry => entry.Namespace ?? string.Empty, StringComparer.Ordinal)
+            .ThenBy(entry => entry.Namespace, StringComparer.Ordinal)
             .ToArray();
 
         foreach (var entry in methodHints)
@@ -325,7 +325,7 @@ public sealed class ArchitecturePassportGenerator
                             entry.Name.EndsWith("Installer", StringComparison.Ordinal) ||
                             entry.Name.Contains("DependencyInjection", StringComparison.Ordinal))
             .OrderBy(entry => entry.Name, StringComparer.Ordinal)
-            .ThenBy(entry => entry.Namespace ?? string.Empty, StringComparer.Ordinal)
+            .ThenBy(entry => entry.Namespace, StringComparer.Ordinal)
             .ToArray();
 
         foreach (var entry in typeHints)
