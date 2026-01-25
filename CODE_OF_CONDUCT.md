@@ -14,7 +14,7 @@ Examples of unacceptable behavior include:
 - Publishing others' private information
 
 ## Enforcement
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to **conduct@example.com**. All complaints will be reviewed and investigated.
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to **paul.maddison.delimeg@gmail.com**. All complaints will be reviewed and investigated.
 
 ## Attribution
 This Code of Conduct is adapted from the Contributor Covenant, version 2.1.
