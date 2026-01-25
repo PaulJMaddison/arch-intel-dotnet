@@ -72,11 +72,24 @@ internal static class Program
             await RunReportAsync(logger, solution, output, configPath, format, "impact", symbol);
         }, solutionOption, symbolOption, outputOption, configOption, formatOption);
 
+        var projectGraphCommand = new Command("project-graph", "Generate a project dependency graph.")
+        {
+            solutionOption,
+            outputOption,
+            configOption,
+            formatOption
+        };
+        projectGraphCommand.SetHandler(async (solution, output, configPath, format) =>
+        {
+            await RunReportAsync(logger, solution, output, configPath, format, "project_graph", null);
+        }, solutionOption, outputOption, configOption, formatOption);
+
         var root = new RootCommand("ArchIntel CLI")
         {
             scanCommand,
             passportCommand,
-            impactCommand
+            impactCommand,
+            projectGraphCommand
         };
 
         var versionOption = new Option<bool>("--version", "Show version information.");
