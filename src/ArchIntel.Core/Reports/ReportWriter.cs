@@ -12,7 +12,7 @@ public enum ReportFormat
     Both
 }
 
-public sealed class ReportWriter
+public sealed class ReportWriter : IReportWriter
 {
     private readonly IFileSystem _fileSystem;
 
@@ -25,23 +25,21 @@ public sealed class ReportWriter
         _fileSystem = fileSystem;
     }
 
-    public async Task WriteAsync(AnalysisContext context, string reportKind, string? symbol, ReportFormat format, CancellationToken cancellationToken)
+    public async Task<ReportOutcome> WriteAsync(AnalysisContext context, string reportKind, string? symbol, ReportFormat format, CancellationToken cancellationToken)
     {
         var outputDirectory = context.OutputDir;
         _fileSystem.CreateDirectory(outputDirectory);
 
         if (context.PipelineTimer is null)
         {
-            await WriteReportsAsync(context, reportKind, symbol, format, outputDirectory, cancellationToken);
+            return await WriteReportsAsync(context, reportKind, symbol, format, outputDirectory, cancellationToken);
         }
-        else
-        {
-            await context.PipelineTimer.TimeWriteReportsAsync(
-                () => WriteReportsAsync(context, reportKind, symbol, format, outputDirectory, cancellationToken));
-        }
+
+        return await context.PipelineTimer.TimeWriteReportsAsync(
+            () => WriteReportsAsync(context, reportKind, symbol, format, outputDirectory, cancellationToken));
     }
 
-    private async Task WriteReportsAsync(
+    private async Task<ReportOutcome> WriteReportsAsync(
         AnalysisContext context,
         string reportKind,
         string? symbol,
@@ -55,7 +53,7 @@ public sealed class ReportWriter
             var cacheStore = new FileCacheStore(_fileSystem, hashService, context.CacheDir);
             var generator = new ArchitecturePassportGenerator(_fileSystem, cacheStore);
             await generator.WriteAsync(context, outputDirectory, cancellationToken);
-            return;
+            return new ReportOutcome(null);
         }
 
         if (string.Equals(reportKind, "project_graph", StringComparison.OrdinalIgnoreCase))
@@ -79,7 +77,7 @@ public sealed class ReportWriter
                 await _fileSystem.WriteAllTextAsync(mdPath, markdown, cancellationToken);
             }
 
-            return;
+            return new ReportOutcome(null);
         }
 
         if (string.Equals(reportKind, "violations", StringComparison.OrdinalIgnoreCase))
@@ -101,7 +99,7 @@ public sealed class ReportWriter
                 await _fileSystem.WriteAllTextAsync(mdPath, markdown, cancellationToken);
             }
 
-            return;
+            return new ReportOutcome(rulesData.Violations.Count);
         }
 
         if (string.Equals(reportKind, "impact", StringComparison.OrdinalIgnoreCase))
@@ -128,7 +126,7 @@ public sealed class ReportWriter
                 await _fileSystem.WriteAllTextAsync(mdPath, markdown, cancellationToken);
             }
 
-            return;
+            return new ReportOutcome(null);
         }
 
         var data = ReportData.Create(context, reportKind, symbol);
@@ -153,6 +151,8 @@ public sealed class ReportWriter
             await ScanSummaryReport.WriteAsync(context, _fileSystem, outputDirectory, cancellationToken);
             await SymbolIndexReport.WriteAsync(context, _fileSystem, outputDirectory, cancellationToken);
         }
+
+        return new ReportOutcome(null);
     }
 
     private static string BuildMarkdown(ReportData data)

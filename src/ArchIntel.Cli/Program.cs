@@ -2,10 +2,7 @@ using System.CommandLine;
 using System.CommandLine.Builder;
 using System.CommandLine.Help;
 using System.CommandLine.Invocation;
-using System.CommandLine.Parsing;
-using System.Diagnostics;
 using ArchIntel.Analysis;
-using ArchIntel.Configuration;
 using ArchIntel.Logging;
 using ArchIntel.Reports;
 using Microsoft.Extensions.Logging;
@@ -35,6 +32,7 @@ internal static class Program
         var failOnLoadIssuesOption = new Option<bool?>(
             "--fail-on-load-issues",
             "Fail if MSBuild reports fatal load issues.");
+        var strictOption = new Option<bool>("--strict", "Enable strict mode (CI-grade exit codes).");
         var symbolOption = new Option<string>("--symbol")
         {
             IsRequired = true,
@@ -47,12 +45,26 @@ internal static class Program
             outputOption,
             configOption,
             formatOption,
-            failOnLoadIssuesOption
+            failOnLoadIssuesOption,
+            strictOption
         };
-        scanCommand.SetHandler(async (solution, output, configPath, format, failOnLoadIssues, openOutput) =>
+        scanCommand.SetHandler(async (solution, output, configPath, format, failOnLoadIssues, strict, openOutput) =>
         {
-            await RunReportAsync(logger, solution, output, configPath, format, failOnLoadIssues, "scan", null, openOutput);
-        }, solutionOption, outputOption, configOption, formatOption, failOnLoadIssuesOption, openOption);
+            return await CliExecutor.RunReportAsync(
+                logger,
+                new SolutionLoader(logger),
+                new ReportWriter(),
+                solution,
+                output,
+                configPath,
+                format,
+                failOnLoadIssues,
+                strict,
+                "scan",
+                null,
+                openOutput,
+                CancellationToken.None);
+        }, solutionOption, outputOption, configOption, formatOption, failOnLoadIssuesOption, strictOption, openOption);
 
         var passportCommand = new Command("passport", "Generate an architecture passport.")
         {
@@ -60,12 +72,26 @@ internal static class Program
             outputOption,
             configOption,
             formatOption,
-            failOnLoadIssuesOption
+            failOnLoadIssuesOption,
+            strictOption
         };
-        passportCommand.SetHandler(async (solution, output, configPath, format, failOnLoadIssues, openOutput) =>
+        passportCommand.SetHandler(async (solution, output, configPath, format, failOnLoadIssues, strict, openOutput) =>
         {
-            await RunReportAsync(logger, solution, output, configPath, format, failOnLoadIssues, "passport", null, openOutput);
-        }, solutionOption, outputOption, configOption, formatOption, failOnLoadIssuesOption, openOption);
+            return await CliExecutor.RunReportAsync(
+                logger,
+                new SolutionLoader(logger),
+                new ReportWriter(),
+                solution,
+                output,
+                configPath,
+                format,
+                failOnLoadIssues,
+                strict,
+                "passport",
+                null,
+                openOutput,
+                CancellationToken.None);
+        }, solutionOption, outputOption, configOption, formatOption, failOnLoadIssuesOption, strictOption, openOption);
 
         var impactCommand = new Command("impact", "Analyze impact for a specific symbol.")
         {
@@ -74,12 +100,26 @@ internal static class Program
             outputOption,
             configOption,
             formatOption,
-            failOnLoadIssuesOption
+            failOnLoadIssuesOption,
+            strictOption
         };
-        impactCommand.SetHandler(async (solution, symbol, output, configPath, format, failOnLoadIssues, openOutput) =>
+        impactCommand.SetHandler(async (solution, symbol, output, configPath, format, failOnLoadIssues, strict, openOutput) =>
         {
-            await RunReportAsync(logger, solution, output, configPath, format, failOnLoadIssues, "impact", symbol, openOutput);
-        }, solutionOption, symbolOption, outputOption, configOption, formatOption, failOnLoadIssuesOption, openOption);
+            return await CliExecutor.RunReportAsync(
+                logger,
+                new SolutionLoader(logger),
+                new ReportWriter(),
+                solution,
+                output,
+                configPath,
+                format,
+                failOnLoadIssues,
+                strict,
+                "impact",
+                symbol,
+                openOutput,
+                CancellationToken.None);
+        }, solutionOption, symbolOption, outputOption, configOption, formatOption, failOnLoadIssuesOption, strictOption, openOption);
 
         var projectGraphCommand = new Command("project-graph", "Generate a project dependency graph.")
         {
@@ -87,12 +127,26 @@ internal static class Program
             outputOption,
             configOption,
             formatOption,
-            failOnLoadIssuesOption
+            failOnLoadIssuesOption,
+            strictOption
         };
-        projectGraphCommand.SetHandler(async (solution, output, configPath, format, failOnLoadIssues, openOutput) =>
+        projectGraphCommand.SetHandler(async (solution, output, configPath, format, failOnLoadIssues, strict, openOutput) =>
         {
-            await RunReportAsync(logger, solution, output, configPath, format, failOnLoadIssues, "project_graph", null, openOutput);
-        }, solutionOption, outputOption, configOption, formatOption, failOnLoadIssuesOption, openOption);
+            return await CliExecutor.RunReportAsync(
+                logger,
+                new SolutionLoader(logger),
+                new ReportWriter(),
+                solution,
+                output,
+                configPath,
+                format,
+                failOnLoadIssues,
+                strict,
+                "project_graph",
+                null,
+                openOutput,
+                CancellationToken.None);
+        }, solutionOption, outputOption, configOption, formatOption, failOnLoadIssuesOption, strictOption, openOption);
 
         var violationsCommand = new Command("violations", "Check architecture rules and drift.")
         {
@@ -100,12 +154,26 @@ internal static class Program
             outputOption,
             configOption,
             formatOption,
-            failOnLoadIssuesOption
+            failOnLoadIssuesOption,
+            strictOption
         };
-        violationsCommand.SetHandler(async (solution, output, configPath, format, failOnLoadIssues, openOutput) =>
+        violationsCommand.SetHandler(async (solution, output, configPath, format, failOnLoadIssues, strict, openOutput) =>
         {
-            await RunReportAsync(logger, solution, output, configPath, format, failOnLoadIssues, "violations", null, openOutput);
-        }, solutionOption, outputOption, configOption, formatOption, failOnLoadIssuesOption, openOption);
+            return await CliExecutor.RunReportAsync(
+                logger,
+                new SolutionLoader(logger),
+                new ReportWriter(),
+                solution,
+                output,
+                configPath,
+                format,
+                failOnLoadIssues,
+                strict,
+                "violations",
+                null,
+                openOutput,
+                CancellationToken.None);
+        }, solutionOption, outputOption, configOption, formatOption, failOnLoadIssuesOption, strictOption, openOption);
 
         var root = new RootCommand("ArchIntel CLI")
         {
@@ -132,155 +200,14 @@ internal static class Program
             .UseDefaults()
             .Build();
 
-        return await parser.InvokeAsync(args);
-    }
-
-    private static async Task RunReportAsync(
-        ILogger logger,
-        string solution,
-        string? output,
-        string? configPath,
-        string? format,
-        bool? failOnLoadIssues,
-        string reportKind,
-        string? symbol,
-        bool openOutput)
-    {
-        var config = AnalysisConfig.Load(configPath);
-        var mergedConfig = MergeConfig(config, output, failOnLoadIssues);
-        var pipelineTimer = new PipelineTimer();
-        var solutionLoader = new SolutionLoader(logger);
-        var reportFormat = ParseFormat(format);
-
-        using var cancellationSource = new CancellationTokenSource();
-        ConsoleCancelEventHandler? handler = (_, args) =>
-        {
-            args.Cancel = true;
-            cancellationSource.Cancel();
-        };
-
-        Console.CancelKeyPress += handler;
         try
         {
-            var loadResult = await pipelineTimer.TimeLoadSolutionAsync(
-                () => solutionLoader.LoadAsync(solution, mergedConfig.FailOnLoadIssues, cancellationSource.Token));
-            var context = new AnalysisContext(
-                loadResult.SolutionPath,
-                loadResult.RepoRootPath,
-                loadResult.Solution,
-                mergedConfig,
-                logger,
-                pipelineTimer: pipelineTimer,
-                loadDiagnostics: loadResult.LoadDiagnostics);
-
-            SafeLog.Info(logger, "Generating {ReportKind} report for {Solution}.", reportKind, SafeLog.SanitizePath(solution));
-
-            var writer = new ReportWriter();
-            await writer.WriteAsync(context, reportKind, symbol, reportFormat, cancellationSource.Token);
-
-            SafeLog.Info(logger, "Report written to {OutputDir}.", SafeLog.SanitizePath(context.OutputDir));
-
-            if (string.Equals(reportKind, "scan", StringComparison.OrdinalIgnoreCase))
-            {
-                LogLoadDiagnosticsSummary(logger, context.LoadDiagnostics);
-            }
-
-            if (openOutput)
-            {
-                OpenOutputDirectory(logger, context.OutputDir);
-            }
-        }
-        finally
-        {
-            Console.CancelKeyPress -= handler;
-        }
-    }
-
-    private static void OpenOutputDirectory(ILogger logger, string outputDir)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = outputDir,
-                UseShellExecute = true
-            });
+            return await parser.InvokeAsync(args);
         }
         catch (Exception ex)
         {
-            SafeLog.Warn(logger, "Unable to open output directory: {Message}", SafeLog.SanitizeValue(ex.Message));
+            SafeLog.Error(logger, "Unexpected error: {Message}", SafeLog.SanitizeValue(ex.Message));
+            return ExitCodes.UnexpectedError;
         }
-    }
-
-    private static AnalysisConfig MergeConfig(AnalysisConfig config, string? output, bool? failOnLoadIssues)
-    {
-        if (string.IsNullOrWhiteSpace(output))
-        {
-            if (failOnLoadIssues is null)
-            {
-                return config;
-            }
-
-            return new AnalysisConfig
-            {
-                IncludeGlobs = config.IncludeGlobs,
-                ExcludeGlobs = config.ExcludeGlobs,
-                OutputDir = config.OutputDir,
-                CacheDir = config.CacheDir,
-                MaxDegreeOfParallelism = config.MaxDegreeOfParallelism,
-                FailOnLoadIssues = failOnLoadIssues.Value,
-                ArchitectureRules = config.ArchitectureRules
-            };
-        }
-
-        return new AnalysisConfig
-        {
-            IncludeGlobs = config.IncludeGlobs,
-            ExcludeGlobs = config.ExcludeGlobs,
-            OutputDir = output,
-            CacheDir = config.CacheDir,
-            MaxDegreeOfParallelism = config.MaxDegreeOfParallelism,
-            FailOnLoadIssues = failOnLoadIssues ?? config.FailOnLoadIssues,
-            ArchitectureRules = config.ArchitectureRules
-        };
-    }
-
-    private static void LogLoadDiagnosticsSummary(ILogger logger, IReadOnlyList<LoadDiagnostic> diagnostics)
-    {
-        if (diagnostics.Count == 0)
-        {
-            SafeLog.Info(logger, "Load issues: none.");
-            return;
-        }
-
-        const int maxMessages = 3;
-        var messageList = diagnostics
-            .Take(maxMessages)
-            .Select(diagnostic => SafeLog.SanitizeValue(diagnostic.Message))
-            .ToList();
-
-        var summary = string.Join(" | ", messageList);
-        SafeLog.Warn(
-            logger,
-            "Load issues: {Count}. Top {TopCount}: {Summary}",
-            diagnostics.Count,
-            messageList.Count,
-            summary);
-    }
-
-    private static ReportFormat ParseFormat(string? format)
-    {
-        if (string.IsNullOrWhiteSpace(format))
-        {
-            return ReportFormat.Json;
-        }
-
-        return format.Trim().ToLowerInvariant() switch
-        {
-            "json" => ReportFormat.Json,
-            "md" => ReportFormat.Markdown,
-            "both" => ReportFormat.Both,
-            _ => throw new ArgumentException("Unsupported format. Use json, md, or both.")
-        };
     }
 }
