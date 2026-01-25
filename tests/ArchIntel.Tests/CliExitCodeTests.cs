@@ -28,6 +28,7 @@ public sealed class CliExitCodeTests
             null,
             null,
             false,
+            false,
             "scan",
             null,
             false,
@@ -57,6 +58,7 @@ public sealed class CliExitCodeTests
             null,
             null,
             true,
+            false,
             "scan",
             null,
             false,
@@ -83,6 +85,7 @@ public sealed class CliExitCodeTests
             null,
             null,
             true,
+            false,
             "violations",
             null,
             false,
@@ -108,6 +111,7 @@ public sealed class CliExitCodeTests
             null,
             null,
             true,
+            false,
             "scan",
             null,
             false,
@@ -133,6 +137,7 @@ public sealed class CliExitCodeTests
             null,
             null,
             null,
+            false,
             false,
             "scan",
             null,
@@ -162,6 +167,7 @@ public sealed class CliExitCodeTests
         public Task<SolutionLoadResult> LoadAsync(
             string solutionPathOrDirectory,
             bool failOnLoadIssues,
+            bool verbose,
             CancellationToken cancellationToken)
         {
             return _handler(solutionPathOrDirectory);

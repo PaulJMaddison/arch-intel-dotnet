@@ -48,7 +48,7 @@ public sealed class AnalysisConfig
             return Path.GetFullPath(configPath);
         }
 
-        var defaultPath = Path.Combine(Directory.GetCurrentDirectory(), ".archtool", "config.json");
+        var defaultPath = Path.Combine(Directory.GetCurrentDirectory(), ".archintel", "config.json");
         return defaultPath;
     }
 }

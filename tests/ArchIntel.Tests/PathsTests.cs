@@ -12,6 +12,6 @@ public class PathsTests
 
         var result = Paths.GetReportsDirectory(baseDirectory, null);
 
-        Assert.Equal("/repo/.archtool/reports", result.Replace('\\', '/'));
+        Assert.Equal("/repo/.archintel", result.Replace('\\', '/'));
     }
 }

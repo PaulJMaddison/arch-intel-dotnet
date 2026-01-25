@@ -7,6 +7,7 @@ public interface ISolutionLoader
     Task<SolutionLoadResult> LoadAsync(
         string solutionPathOrDirectory,
         bool failOnLoadIssues,
+        bool verbose,
         CancellationToken cancellationToken);
 }
 
