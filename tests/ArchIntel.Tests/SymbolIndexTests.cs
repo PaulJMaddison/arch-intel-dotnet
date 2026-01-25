@@ -151,6 +151,49 @@ public sealed class SymbolIndexTests
         Assert.Contains(namespaces, stat => stat.Name == "(global)");
     }
 
+    [Fact]
+    public async Task BuildAsync_IndexesPublicMethodsAcrossInterfacesAndRecords()
+    {
+        var workspace = new AdhocWorkspace();
+        var solution = workspace.CurrentSolution;
+
+        var projectId = ProjectId.CreateNewId();
+        solution = solution.AddProject(ProjectInfo.Create(projectId, VersionStamp.Create(), "Delta", "Delta", LanguageNames.CSharp, filePath: "/repo/src/Delta/Delta.csproj"));
+
+        solution = solution.AddDocument(
+            DocumentId.CreateNewId(projectId),
+            "Api.cs",
+            @"namespace Delta.Api;
+              public interface IRunner { void Run(); }
+              public class Runner : IRunner
+              {
+                  public Runner() { }
+                  public void Run() { }
+                  internal void Hidden() { }
+                  private void Secret() { }
+                  public int Value { get; set; }
+              }
+              public record LogRecord
+              {
+                  public void Write() { }
+                  private void Scratch() { }
+              }",
+            filePath: "/repo/src/Delta/Api.cs");
+
+        var index = CreateIndex();
+        var data = await index.BuildAsync(solution, "test-version", CancellationToken.None);
+
+        Assert.Contains(data.Symbols, symbol => symbol.Kind == "PublicMethod" && symbol.Name == "Run" && symbol.ContainingType == "IRunner");
+        Assert.Contains(data.Symbols, symbol => symbol.Kind == "PublicMethod" && symbol.Name == "Run" && symbol.ContainingType == "Runner");
+        Assert.Contains(data.Symbols, symbol => symbol.Kind == "PublicMethod" && symbol.Name == "Write" && symbol.ContainingType == "LogRecord");
+        Assert.DoesNotContain(data.Symbols, symbol => symbol.Name == "Hidden");
+        Assert.DoesNotContain(data.Symbols, symbol => symbol.Name == "Secret");
+
+        var namespaces = data.Namespaces.Single(stats => stats.ProjectName == "Delta").Namespaces;
+        var apiNamespace = namespaces.Single(stat => stat.Name == "Delta.Api");
+        Assert.Equal(3, apiNamespace.PublicMethodCount);
+    }
+
     private static SymbolIndex CreateIndex()
     {
         var fileSystem = new PhysicalFileSystem();
