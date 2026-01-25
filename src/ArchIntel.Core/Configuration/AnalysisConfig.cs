@@ -9,6 +9,7 @@ public sealed class AnalysisConfig
     public string? OutputDir { get; init; }
     public string? CacheDir { get; init; }
     public int? MaxDegreeOfParallelism { get; init; }
+    public ArchitectureRulesConfig ArchitectureRules { get; init; } = new();
 
     public int GetEffectiveMaxDegreeOfParallelism()
     {
