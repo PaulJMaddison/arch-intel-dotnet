@@ -49,6 +49,15 @@ public sealed class ReportWriter
         string outputDirectory,
         CancellationToken cancellationToken)
     {
+        if (string.Equals(reportKind, "passport", StringComparison.OrdinalIgnoreCase))
+        {
+            var hashService = new DocumentHashService(_fileSystem);
+            var cacheStore = new FileCacheStore(_fileSystem, hashService, context.CacheDir);
+            var generator = new ArchitecturePassportGenerator(_fileSystem, cacheStore);
+            await generator.WriteAsync(context, outputDirectory, cancellationToken);
+            return;
+        }
+
         if (string.Equals(reportKind, "project_graph", StringComparison.OrdinalIgnoreCase))
         {
             var graphData = context.PipelineTimer is null
