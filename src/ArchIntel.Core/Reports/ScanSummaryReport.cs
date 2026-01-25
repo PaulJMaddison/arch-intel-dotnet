@@ -25,7 +25,7 @@ public static class ScanSummaryReport
         var hashService = new DocumentHashService(fileSystem);
         var cacheStore = new FileCacheStore(fileSystem, hashService, context.CacheDir);
         var cache = new DocumentCache(cacheStore);
-        var scanner = new SolutionScanner(new DocumentFilter(), hashService, cache);
+        var scanner = new SolutionScanner(new DocumentFilter(), hashService, cache, context.MaxDegreeOfParallelism);
 
         var scanData = context.PipelineTimer is null
             ? await scanner.ScanAsync(context, cancellationToken)

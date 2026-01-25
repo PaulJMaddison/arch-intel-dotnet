@@ -139,23 +139,39 @@ internal static class Program
         var mergedConfig = MergeConfig(config, output);
         var pipelineTimer = new PipelineTimer();
         var solutionLoader = new SolutionLoader(logger);
-        var loadResult = await pipelineTimer.TimeLoadSolutionAsync(
-            () => solutionLoader.LoadAsync(solution, CancellationToken.None));
-        var context = new AnalysisContext(
-            loadResult.SolutionPath,
-            loadResult.RepoRootPath,
-            loadResult.Solution,
-            mergedConfig,
-            logger,
-            pipelineTimer);
         var reportFormat = ParseFormat(format);
 
-        SafeLog.Info(logger, "Generating {ReportKind} report for {Solution}.", reportKind, SafeLog.SanitizePath(solution));
+        using var cancellationSource = new CancellationTokenSource();
+        ConsoleCancelEventHandler? handler = (_, args) =>
+        {
+            args.Cancel = true;
+            cancellationSource.Cancel();
+        };
 
-        var writer = new ReportWriter();
-        await writer.WriteAsync(context, reportKind, symbol, reportFormat, CancellationToken.None);
+        Console.CancelKeyPress += handler;
+        try
+        {
+            var loadResult = await pipelineTimer.TimeLoadSolutionAsync(
+                () => solutionLoader.LoadAsync(solution, cancellationSource.Token));
+            var context = new AnalysisContext(
+                loadResult.SolutionPath,
+                loadResult.RepoRootPath,
+                loadResult.Solution,
+                mergedConfig,
+                logger,
+                pipelineTimer);
 
-        SafeLog.Info(logger, "Report written to {OutputDir}.", SafeLog.SanitizePath(context.OutputDir));
+            SafeLog.Info(logger, "Generating {ReportKind} report for {Solution}.", reportKind, SafeLog.SanitizePath(solution));
+
+            var writer = new ReportWriter();
+            await writer.WriteAsync(context, reportKind, symbol, reportFormat, cancellationSource.Token);
+
+            SafeLog.Info(logger, "Report written to {OutputDir}.", SafeLog.SanitizePath(context.OutputDir));
+        }
+        finally
+        {
+            Console.CancelKeyPress -= handler;
+        }
     }
 
     private static AnalysisConfig MergeConfig(AnalysisConfig config, string? output)

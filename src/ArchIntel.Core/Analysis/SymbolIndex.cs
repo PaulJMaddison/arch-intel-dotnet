@@ -55,8 +55,7 @@ public sealed class SymbolIndex
 
         var documents = solution.Projects
             .Where(project => project.Language == LanguageNames.CSharp)
-            .SelectMany(project => project.Documents.Select(document => (Project: project, Document: document)))
-            .ToArray();
+            .SelectMany(project => project.Documents.Select(document => (Project: project, Document: document)));
 
         var options = new ParallelOptions
         {
