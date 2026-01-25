@@ -50,7 +50,7 @@ internal static class Program
         };
         scanCommand.SetHandler(async (solution, output, configPath, format, failOnLoadIssues, strict, openOutput) =>
         {
-            return await CliExecutor.RunReportAsync(
+            await CliExecutor.RunReportAsync(
                 logger,
                 new SolutionLoader(logger),
                 new ReportWriter(),
@@ -77,7 +77,7 @@ internal static class Program
         };
         passportCommand.SetHandler(async (solution, output, configPath, format, failOnLoadIssues, strict, openOutput) =>
         {
-            return await CliExecutor.RunReportAsync(
+            await CliExecutor.RunReportAsync(
                 logger,
                 new SolutionLoader(logger),
                 new ReportWriter(),
@@ -105,7 +105,7 @@ internal static class Program
         };
         impactCommand.SetHandler(async (solution, symbol, output, configPath, format, failOnLoadIssues, strict, openOutput) =>
         {
-            return await CliExecutor.RunReportAsync(
+            await CliExecutor.RunReportAsync(
                 logger,
                 new SolutionLoader(logger),
                 new ReportWriter(),
@@ -132,7 +132,7 @@ internal static class Program
         };
         projectGraphCommand.SetHandler(async (solution, output, configPath, format, failOnLoadIssues, strict, openOutput) =>
         {
-            return await CliExecutor.RunReportAsync(
+            await CliExecutor.RunReportAsync(
                 logger,
                 new SolutionLoader(logger),
                 new ReportWriter(),
@@ -159,7 +159,7 @@ internal static class Program
         };
         violationsCommand.SetHandler(async (solution, output, configPath, format, failOnLoadIssues, strict, openOutput) =>
         {
-            return await CliExecutor.RunReportAsync(
+            await CliExecutor.RunReportAsync(
                 logger,
                 new SolutionLoader(logger),
                 new ReportWriter(),
@@ -202,7 +202,8 @@ internal static class Program
 
         try
         {
-            return await parser.InvokeAsync(args);
+            // Use the root command's InvokeAsync extension method instead of parser.InvokeAsync
+            return await root.InvokeAsync(args);
         }
         catch (Exception ex)
         {

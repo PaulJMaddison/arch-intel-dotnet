@@ -68,7 +68,8 @@ public sealed class SolutionLoaderTests
     public void BuildLoadResult_WhenNonFatalDiagnosticsAndFailOnLoadIssues_DoesNotThrow()
     {
         using var workspace = new AdhocWorkspace();
-        var solution = workspace.CurrentSolution.AddProject("Test", "Test", LanguageNames.CSharp);
+        var project = workspace.CurrentSolution.AddProject("Test", "Test", LanguageNames.CSharp);
+        var solution = project.Solution; // Fix: Get the Solution from the Project
         var diagnostics = new[]
         {
             CreateDiagnostic(WorkspaceDiagnosticKind.Failure, "NU1202 The package was resolved.")

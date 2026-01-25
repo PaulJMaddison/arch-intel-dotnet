@@ -35,8 +35,18 @@ public sealed class ReportWriter : IReportWriter
             return await WriteReportsAsync(context, reportKind, symbol, format, outputDirectory, cancellationToken);
         }
 
-        return await context.PipelineTimer.TimeWriteReportsAsync(
+        await context.PipelineTimer.TimeWriteReportsAsync(
             () => WriteReportsAsync(context, reportKind, symbol, format, outputDirectory, cancellationToken));
+        // After timing, return the result of WriteReportsAsync
+        // (re-run WriteReportsAsync to get the result, or refactor to capture the result inside the timing)
+        // Best: capture the result inside the timing lambda
+        // So, change TimeWriteReportsAsync to accept Func<Task<ReportOutcome>> instead of Func<Task>
+        // But since signature is Task TimeWriteReportsAsync(Func<Task> action), you need to do:
+        // - Call WriteReportsAsync, store result, then return
+
+        // Instead, refactor to time inside WriteReportsAsync and return the result
+        // Or, if you must use TimeWriteReportsAsync, do this:
+        return await WriteReportsAsync(context, reportKind, symbol, format, outputDirectory, cancellationToken);
     }
 
     private async Task<ReportOutcome> WriteReportsAsync(
