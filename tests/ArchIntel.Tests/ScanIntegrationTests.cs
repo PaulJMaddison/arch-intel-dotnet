@@ -16,15 +16,18 @@ public sealed class ScanIntegrationTests
         using var temp = new TemporaryDirectory();
         var solutionPath = GetTestSolutionPath();
         var loader = new SolutionLoader(NullLogger.Instance);
-        var loadResult = await loader.LoadAsync(solutionPath, false, CancellationToken.None);
+        var loadResult = await loader.LoadAsync(solutionPath, false, false, CancellationToken.None);
 
-        var output1 = Path.Combine(temp.Path, "output1");
-        var cache1 = Path.Combine(temp.Path, "cache1");
-        var output2 = Path.Combine(temp.Path, "output2");
-        var cache2 = Path.Combine(temp.Path, "cache2");
+        var outputDir = Path.Combine(temp.Path, "output");
+        var cacheDir = Path.Combine(temp.Path, "cache");
 
-        var first = await RunScanAsync(loadResult.Solution, loadResult.RepoRootPath, loadResult.LoadDiagnostics, output1, cache1);
-        var second = await RunScanAsync(loadResult.Solution, loadResult.RepoRootPath, loadResult.LoadDiagnostics, output2, cache2);
+        var first = await RunScanAsync(loadResult.Solution, loadResult.RepoRootPath, loadResult.LoadDiagnostics, outputDir, cacheDir);
+        if (Directory.Exists(cacheDir))
+        {
+            Directory.Delete(cacheDir, true);
+        }
+
+        var second = await RunScanAsync(loadResult.Solution, loadResult.RepoRootPath, loadResult.LoadDiagnostics, outputDir, cacheDir);
 
         Assert.Equal(first.Count, second.Count);
         foreach (var entry in first)
@@ -103,7 +106,8 @@ public sealed class ScanIntegrationTests
             "scan.json",
             "scan_summary.json",
             "symbols.json",
-            "namespaces.json"
+            "namespaces.json",
+            "README.md"
         };
 
         foreach (var fileName in fileNames)

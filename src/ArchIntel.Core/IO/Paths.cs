@@ -2,9 +2,9 @@ namespace ArchIntel.IO;
 
 public static class Paths
 {
-    public const string ToolDirectoryName = ".archtool";
+    public const string ToolDirectoryName = ".archintel";
     public const string CacheDirectoryName = "cache";
-    public const string ReportsDirectoryName = "reports";
+    public const string ReportsDirectoryName = "";
 
     public static string GetDefaultRootDirectory(string baseDirectory)
     {
@@ -28,6 +28,12 @@ public static class Paths
             return Path.GetFullPath(overridePath);
         }
 
-        return Path.Combine(GetDefaultRootDirectory(baseDirectory), fallbackLeaf);
+        var root = GetDefaultRootDirectory(baseDirectory);
+        if (string.IsNullOrWhiteSpace(fallbackLeaf))
+        {
+            return root;
+        }
+
+        return Path.Combine(root, fallbackLeaf);
     }
 }

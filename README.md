@@ -22,7 +22,7 @@
 - A replacement for full static analysis suites.
 
 ## Zero-infra / local-first design
-ArchIntel is intentionally simple: no network calls, no databases, and no background services. All state is stored in `./.archtool/` within your repo clone for easy cleanup and deterministic output.
+ArchIntel is intentionally simple: no network calls, no databases, and no background services. All state is stored in `./.archintel/` within your repo clone for easy cleanup and deterministic output.
 
 ## Quickstart
 ```bash
@@ -39,20 +39,28 @@ arch impact --solution ./MySolution.sln --symbol My.Namespace.Type --format json
 arch scan --solution ./MySolution.sln --open
 ```
 
+By default, reports are written to `./.archintel` alongside the solution.
+
+## Docs
+- [Getting started](docs/getting-started.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Release checklist](docs/release-checklist.md)
+- [Architecture](docs/architecture.md)
+
 ## Developer Workflow
 Run the build scripts from the repo root to restore, build, test, and verify formatting:
 - macOS/Linux: `./build.sh`
 - Windows (PowerShell): `./build.ps1`
 
 ### Config file
-ArchIntel reads configuration from `./.archtool/config.json` by default, or from `--config`.
+ArchIntel reads configuration from `./.archintel/config.json` by default, or from `--config`.
 
 ```json
 {
   "includeGlobs": ["**/*.cs"],
   "excludeGlobs": ["**/bin/**", "**/obj/**"],
-  "outputDir": "./.archtool/reports",
-  "cacheDir": "./.archtool/cache",
+  "outputDir": "./.archintel",
+  "cacheDir": "./.archintel/cache",
   "maxDegreeOfParallelism": 8,
   "strict": {
     "failOnLoadIssues": true,
@@ -77,6 +85,14 @@ Exit codes:
 - `1`: fatal load failure (solution could not be opened, 0 projects loaded, SDK missing).
 - `2`: strict mode gates tripped (load issues and/or architecture violations).
 - `3`: unexpected crash (unhandled exception).
+
+## Release bundle (win-x64)
+Download the zip from `releases/archintel-v0.1.0-win-x64.zip`, unzip it, and run `arch` from a terminal.
+
+## Performance
+- **Caching:** the cache under `./.archintel/cache` stores document hashes to speed up repeat scans without changing outputs.
+- **Large repos:** expect solution load time to dominate for very large solutions; scans scale with project count and file size.
+- **Knobs:** `maxDegreeOfParallelism` controls parallel symbol indexing and scan throughput. Keep it under your CPU core count for predictable performance.
 
 ## Works without AI. Optional AI guidance.
 ArchIntel works entirely without AI. If you choose to integrate AI guidance, that is optional and must be configured outside of the core tool. The open-source CLI never uploads source code by default.
