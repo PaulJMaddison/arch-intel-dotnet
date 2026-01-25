@@ -13,7 +13,7 @@ public sealed class AnalysisConfig
 
     public int GetEffectiveMaxDegreeOfParallelism()
     {
-        var fallback = Math.Max(1, Environment.ProcessorCount);
+        var fallback = Math.Max(1, Environment.ProcessorCount - 1);
         if (MaxDegreeOfParallelism is null)
         {
             return fallback;

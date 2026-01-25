@@ -14,4 +14,15 @@ public class AnalysisConfigTests
 
         Assert.True(value >= 1);
     }
+
+    [Fact]
+    public void GetEffectiveMaxDegreeOfParallelism_WhenUnset_UsesCpuMinusOne()
+    {
+        var config = new AnalysisConfig();
+
+        var value = config.GetEffectiveMaxDegreeOfParallelism();
+
+        var expected = Math.Max(1, Environment.ProcessorCount - 1);
+        Assert.Equal(expected, value);
+    }
 }

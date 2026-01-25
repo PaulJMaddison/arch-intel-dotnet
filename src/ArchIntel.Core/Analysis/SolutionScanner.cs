@@ -7,12 +7,18 @@ public sealed class SolutionScanner
     private readonly DocumentFilter _filter;
     private readonly DocumentHashService _hashService;
     private readonly DocumentCache _cache;
+    private readonly int _maxDegreeOfParallelism;
 
-    public SolutionScanner(DocumentFilter filter, DocumentHashService hashService, DocumentCache cache)
+    public SolutionScanner(
+        DocumentFilter filter,
+        DocumentHashService hashService,
+        DocumentCache cache,
+        int maxDegreeOfParallelism)
     {
         _filter = filter;
         _hashService = hashService;
         _cache = cache;
+        _maxDegreeOfParallelism = Math.Max(1, maxDegreeOfParallelism);
     }
 
     public async Task<ScanSummaryData> ScanAsync(AnalysisContext context, CancellationToken cancellationToken)
@@ -23,43 +29,49 @@ public sealed class SolutionScanner
         var hits = 0;
         var misses = 0;
 
-        foreach (var project in context.Solution.Projects)
+        var documents = context.Solution.Projects
+            .SelectMany(project => project.Documents.Select(document => (Project: project, Document: document)));
+
+        var options = new ParallelOptions
         {
-            var projectId = project.Id.Id.ToString();
-            foreach (var document in project.Documents)
+            MaxDegreeOfParallelism = _maxDegreeOfParallelism,
+            CancellationToken = cancellationToken
+        };
+
+        await Parallel.ForEachAsync(documents, options, async (item, token) =>
+        {
+            var document = item.Document;
+            if (string.IsNullOrWhiteSpace(document.FilePath))
             {
-                if (string.IsNullOrWhiteSpace(document.FilePath))
-                {
-                    continue;
-                }
-
-                total += 1;
-                if (_filter.IsExcluded(document.FilePath))
-                {
-                    excluded += 1;
-                    continue;
-                }
-
-                analyzed += 1;
-                var text = await document.GetTextAsync(cancellationToken);
-                var contentHash = _hashService.GetContentHash(text.ToString());
-                var key = new CacheKey(
-                    context.AnalysisVersion,
-                    projectId,
-                    Path.GetFullPath(document.FilePath),
-                    contentHash);
-
-                var status = await _cache.GetStatusAsync(key, cancellationToken);
-                if (status == CacheStatus.Hit)
-                {
-                    hits += 1;
-                }
-                else
-                {
-                    misses += 1;
-                }
+                return;
             }
-        }
+
+            Interlocked.Increment(ref total);
+            if (_filter.IsExcluded(document.FilePath))
+            {
+                Interlocked.Increment(ref excluded);
+                return;
+            }
+
+            Interlocked.Increment(ref analyzed);
+            var text = await document.GetTextAsync(token);
+            var contentHash = _hashService.GetContentHash(text.ToString());
+            var key = new CacheKey(
+                context.AnalysisVersion,
+                item.Project.Id.Id.ToString(),
+                Path.GetFullPath(document.FilePath),
+                contentHash);
+
+            var status = await _cache.GetStatusAsync(key, token);
+            if (status == CacheStatus.Hit)
+            {
+                Interlocked.Increment(ref hits);
+            }
+            else
+            {
+                Interlocked.Increment(ref misses);
+            }
+        });
 
         return new ScanSummaryData(
             new ScanCounts(total, excluded, analyzed),
