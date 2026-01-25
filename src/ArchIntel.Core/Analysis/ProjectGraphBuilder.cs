@@ -55,7 +55,7 @@ public static class ProjectGraphBuilder
         return ProjectGraph.Create(
             new ReadOnlyCollection<ProjectNode>(nodes),
             new ReadOnlyCollection<ProjectEdge>(edges),
-            new ReadOnlyCollection<IReadOnlyList<string>>(cycles));
+            new ReadOnlyCollection<IReadOnlyList<string>>(cycles.ToList()));
     }
 
     private static string CreateStableId(Project project)

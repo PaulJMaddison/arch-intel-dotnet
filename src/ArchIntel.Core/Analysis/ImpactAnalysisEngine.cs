@@ -74,8 +74,10 @@ public sealed class ImpactAnalysisEngine
         }
 
         var simpleName = ExtractSimpleName(normalizedSymbolName);
-        var declarations = await SymbolFinder.FindDeclarationsAsync(solution, simpleName, ignoreCase: false, cancellationToken);
-        var matchingSymbols = declarations
+        var declarationsByProject = await Task.WhenAll(solution.Projects.Select(project =>
+            SymbolFinder.FindDeclarationsAsync(project, simpleName, ignoreCase: false, cancellationToken)));
+        var matchingSymbols = declarationsByProject
+            .SelectMany(declarations => declarations)
             .Where(symbol => string.Equals(GetQualifiedName(symbol), normalizedSymbolName, StringComparison.Ordinal))
             .ToArray();
 
