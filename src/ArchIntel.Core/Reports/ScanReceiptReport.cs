@@ -19,7 +19,8 @@ public sealed record ScanReceiptReportData(
     bool? StrictFailOnViolations,
     IReadOnlyList<string> IncludeGlobs,
     IReadOnlyList<string> ExcludeGlobs,
-    IReadOnlyList<ScanReceiptProject> Projects);
+    IReadOnlyList<ScanReceiptProject> Projects,
+    IReadOnlyList<string> DeterministicRules);
 
 public static class ScanReceiptReport
 {
@@ -50,7 +51,8 @@ public static class ScanReceiptReport
             context.Config.Strict.FailOnViolations,
             include,
             exclude,
-            projects);
+            projects,
+            InsightsReport.DeterministicRules);
     }
 
     public static string BuildMarkdown(ScanReceiptReportData data, SymbolIndexData? symbolData = null)
@@ -68,6 +70,7 @@ public static class ScanReceiptReport
         builder.AppendLine($"- Strict fail on violations: {FormatOptionalBool(data.StrictFailOnViolations)}");
         builder.AppendLine($"- Include globs: {FormatList(data.IncludeGlobs)}");
         builder.AppendLine($"- Exclude globs: {FormatList(data.ExcludeGlobs)}");
+        builder.AppendLine($"- Deterministic insight rules: {FormatList(data.DeterministicRules)}");
         builder.AppendLine();
         builder.AppendLine("## Projects");
         if (data.Projects.Count == 0)
