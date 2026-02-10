@@ -43,6 +43,13 @@ public sealed class SymbolIndexTests
         var alphaNamespace = alphaNamespaces.Single(stat => stat.Name == "Alpha");
         Assert.Equal(1, alphaNamespace.NamedTypeCount);
         Assert.Equal(1, alphaNamespace.PublicMethodCount);
+        Assert.Equal(2, alphaNamespace.TotalMethodCount);
+        Assert.Equal(1, alphaNamespace.InternalMethodCount);
+
+        var methodTotals = data.GetMethodCountTotals();
+        Assert.Equal(2, methodTotals.PublicMethodCount);
+        Assert.Equal(3, methodTotals.TotalMethodCount);
+        Assert.Equal(1, methodTotals.InternalMethodCount);
     }
 
     [Fact]
@@ -192,6 +199,8 @@ public sealed class SymbolIndexTests
         var namespaces = data.Namespaces.Single(stats => stats.ProjectName == "Delta").Namespaces;
         var apiNamespace = namespaces.Single(stat => stat.Name == "Delta.Api");
         Assert.Equal(3, apiNamespace.PublicMethodCount);
+        Assert.Equal(6, apiNamespace.TotalMethodCount);
+        Assert.Equal(3, apiNamespace.InternalMethodCount);
     }
 
     private static SymbolIndex CreateIndex()

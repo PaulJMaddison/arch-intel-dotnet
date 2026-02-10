@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ArchIntel.Analysis;
 using ArchIntel.Configuration;
 using ArchIntel.Reports;
@@ -72,8 +73,33 @@ public sealed class ScanIntegrationTests
         _ = await writer.WriteAsync(context, "scan", null, ReportFormat.Json, CancellationToken.None);
 
         var summaryPath = Path.Combine(outputDir, "scan_summary.json");
-        var summaryJson = File.ReadAllText(summaryPath);
-        Assert.Contains("loadDiagnostics", summaryJson, StringComparison.OrdinalIgnoreCase);
+        var namespacesPath = Path.Combine(outputDir, "namespaces.json");
+
+        using var summaryDocument = JsonDocument.Parse(File.ReadAllText(summaryPath));
+        var methodCounts = summaryDocument.RootElement.GetProperty("MethodCounts");
+        var summaryPublicMethodCount = methodCounts.GetProperty("PublicMethodCount").GetInt32();
+        var summaryTotalMethodCount = methodCounts.GetProperty("TotalMethodCount").GetInt32();
+        var summaryInternalMethodCount = methodCounts.GetProperty("InternalMethodCount").GetInt32();
+
+        using var namespacesDocument = JsonDocument.Parse(File.ReadAllText(namespacesPath));
+        var namespacesRoot = namespacesDocument.RootElement;
+        var namespacePublicMethodCount = 0;
+        var namespaceTotalMethodCount = 0;
+        var namespaceInternalMethodCount = 0;
+
+        foreach (var project in namespacesRoot.EnumerateArray())
+        {
+            foreach (var ns in project.GetProperty("Namespaces").EnumerateArray())
+            {
+                namespacePublicMethodCount += ns.GetProperty("PublicMethodCount").GetInt32();
+                namespaceTotalMethodCount += ns.GetProperty("TotalMethodCount").GetInt32();
+                namespaceInternalMethodCount += ns.GetProperty("InternalMethodCount").GetInt32();
+            }
+        }
+
+        Assert.Equal(namespacePublicMethodCount, summaryPublicMethodCount);
+        Assert.Equal(namespaceTotalMethodCount, summaryTotalMethodCount);
+        Assert.Equal(namespaceInternalMethodCount, summaryInternalMethodCount);
     }
 
     private static async Task<Dictionary<string, string>> RunScanAsync(

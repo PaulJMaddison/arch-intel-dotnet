@@ -34,6 +34,11 @@ You can also set strict defaults in `.archintel/config.json` via the `strict` bl
 - **FailedProjectCount:** best-effort count of projects that failed to load. If a fatal diagnostic cannot be mapped to a specific project, it is still counted as a failure.
 - **AnalyzedDocuments:** number of documents actually processed by the scanner (after exclusions).
 
+`scan_summary.json` also includes a `MethodCounts` block with these deterministic counting rules (the same rules used by `namespaces.json`):
+- **PublicMethodCount:** ordinary methods declared `public`; excludes constructors, operators, and property/event accessors.
+- **TotalMethodCount:** all ordinary methods regardless of accessibility; excludes constructors, operators, and property/event accessors.
+- **InternalMethodCount:** `TotalMethodCount - PublicMethodCount`.
+
 `ProjectCount` can be `0` when MSBuild is unable to load any projects (for example, missing SDKs or workloads). In that case, ArchIntel exits with a non-zero code even in default mode.
 
 ## Common solution load issues

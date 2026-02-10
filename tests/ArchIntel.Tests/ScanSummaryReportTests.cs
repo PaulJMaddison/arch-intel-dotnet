@@ -52,6 +52,11 @@ public sealed class ScanSummaryReportTests
         Assert.Equal(0, counts.GetProperty("FailedProjectCount").GetInt32());
         Assert.Equal(1, counts.GetProperty("AnalyzedDocuments").GetInt32());
 
+        Assert.True(root.TryGetProperty("MethodCounts", out var methodCounts));
+        Assert.Equal(0, methodCounts.GetProperty("PublicMethodCount").GetInt32());
+        Assert.Equal(0, methodCounts.GetProperty("TotalMethodCount").GetInt32());
+        Assert.Equal(0, methodCounts.GetProperty("InternalMethodCount").GetInt32());
+
         Assert.True(root.TryGetProperty("LoadDiagnostics", out var loadDiagnostics));
         Assert.Equal(JsonValueKind.Array, loadDiagnostics.ValueKind);
         Assert.Equal(1, loadDiagnostics.GetArrayLength());

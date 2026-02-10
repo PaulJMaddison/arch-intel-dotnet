@@ -13,7 +13,12 @@ public sealed record SymbolIndexEntry(
     string ProjectName,
     string ProjectId);
 
-public sealed record NamespaceStat(string Name, int NamedTypeCount, int PublicMethodCount);
+public sealed record NamespaceStat(
+    string Name,
+    int NamedTypeCount,
+    int PublicMethodCount,
+    int TotalMethodCount,
+    int InternalMethodCount);
 
 public sealed record ProjectNamespaceStats(
     string ProjectName,
@@ -22,7 +27,26 @@ public sealed record ProjectNamespaceStats(
 
 public sealed record SymbolIndexData(
     IReadOnlyList<SymbolIndexEntry> Symbols,
-    IReadOnlyList<ProjectNamespaceStats> Namespaces);
+    IReadOnlyList<ProjectNamespaceStats> Namespaces)
+{
+    public MethodCountTotals GetMethodCountTotals()
+    {
+        var publicMethodCount = 0;
+        var totalMethodCount = 0;
+        var internalMethodCount = 0;
+
+        foreach (var ns in Namespaces.SelectMany(project => project.Namespaces))
+        {
+            publicMethodCount += ns.PublicMethodCount;
+            totalMethodCount += ns.TotalMethodCount;
+            internalMethodCount += ns.InternalMethodCount;
+        }
+
+        return new MethodCountTotals(publicMethodCount, totalMethodCount, internalMethodCount);
+    }
+}
+
+public sealed record MethodCountTotals(int PublicMethodCount, int TotalMethodCount, int InternalMethodCount);
 
 public sealed class SymbolIndex
 {
@@ -99,6 +123,16 @@ public sealed class SymbolIndex
 
             foreach (var syntaxSymbol in CollectSyntaxSymbols(root, semanticModel, token))
             {
+                var namespaceName = string.IsNullOrWhiteSpace(syntaxSymbol.Namespace) ? string.Empty : syntaxSymbol.Namespace;
+                var counterKey = (project.Id.Id.ToString(), namespaceName);
+                var counter = namespaceCounters.GetOrAdd(counterKey, _ => new NamespaceCounter(project.Name, project.Id.Id.ToString(), namespaceName));
+                counter.Increment(syntaxSymbol.Kind);
+
+                if (!ShouldIncludeInSymbolIndex(syntaxSymbol.Kind))
+                {
+                    continue;
+                }
+
                 var symbolId = SymbolIdFactory.Create(syntaxSymbol.Symbol, syntaxSymbol, project.Id.Id.ToString());
                 if (!symbolIds.TryAdd(symbolId, 0))
                 {
@@ -108,9 +142,6 @@ public sealed class SymbolIndex
                 var entry = CreateEntry(syntaxSymbol, project, symbolId);
                 symbols.Add(entry);
 
-                var counterKey = (entry.ProjectId, entry.Namespace);
-                var counter = namespaceCounters.GetOrAdd(counterKey, _ => new NamespaceCounter(entry.ProjectName, entry.ProjectId, entry.Namespace));
-                counter.Increment(entry.Kind);
             }
         });
 
@@ -133,7 +164,9 @@ public sealed class SymbolIndex
                     .Select(counter => new NamespaceStat(
                         string.IsNullOrWhiteSpace(counter.Namespace) ? "(global)" : counter.Namespace,
                         counter.NamedTypeCount,
-                        counter.PublicMethodCount))
+                        counter.PublicMethodCount,
+                        counter.TotalMethodCount,
+                        counter.InternalMethodCount))
                     .ToArray()))
             .OrderBy(stats => stats.ProjectName, StringComparer.Ordinal)
             .ThenBy(stats => stats.ProjectId, StringComparer.Ordinal)
@@ -209,7 +242,7 @@ public sealed class SymbolIndex
                 case MethodDeclarationSyntax methodDeclaration:
                 {
                     var methodSymbol = semanticModel.GetDeclaredSymbol(methodDeclaration, cancellationToken) as IMethodSymbol;
-                    if (IsPublicMethod(methodSymbol))
+                    if (IsCountedMethod(methodSymbol))
                     {
                         yield return SyntaxSymbol.CreateMethod(methodDeclaration, methodSymbol);
                     }
@@ -220,20 +253,25 @@ public sealed class SymbolIndex
         }
     }
 
-    private static bool IsPublicMethod(IMethodSymbol? methodSymbol)
+    private static bool IsCountedMethod(IMethodSymbol? methodSymbol)
     {
         if (methodSymbol is null)
         {
             return false;
         }
 
-        // Count only ordinary public methods; exclude constructors, operators, and accessors.
+        // Count only ordinary methods; exclude constructors, operators, and accessors.
         if (methodSymbol.MethodKind != MethodKind.Ordinary)
         {
             return false;
         }
 
-        return methodSymbol.DeclaredAccessibility == Accessibility.Public;
+        return true;
+    }
+
+    private static bool ShouldIncludeInSymbolIndex(SymbolKind kind)
+    {
+        return kind is SymbolKind.NamedType or SymbolKind.PublicMethod;
     }
 
     private readonly record struct ProjectKey(string ProjectId, string ProjectName);
@@ -252,19 +290,27 @@ public sealed class SymbolIndex
         public string Namespace { get; }
         public int NamedTypeCount => _namedTypeCount;
         public int PublicMethodCount => _publicMethodCount;
+        public int TotalMethodCount => _totalMethodCount;
+        public int InternalMethodCount => _totalMethodCount - _publicMethodCount;
 
         private int _namedTypeCount;
         private int _publicMethodCount;
+        private int _totalMethodCount;
 
-        public void Increment(string kind)
+        public void Increment(SymbolKind kind)
         {
-            if (string.Equals(kind, SymbolKind.NamedType.ToString(), StringComparison.Ordinal))
+            if (kind == SymbolKind.NamedType)
             {
                 Interlocked.Increment(ref _namedTypeCount);
             }
-            else
+            else if (kind == SymbolKind.PublicMethod)
             {
                 Interlocked.Increment(ref _publicMethodCount);
+                Interlocked.Increment(ref _totalMethodCount);
+            }
+            else if (kind == SymbolKind.Method)
+            {
+                Interlocked.Increment(ref _totalMethodCount);
             }
         }
     }
@@ -272,6 +318,7 @@ public sealed class SymbolIndex
     private enum SymbolKind
     {
         NamedType,
+        Method,
         PublicMethod
     }
 
@@ -320,15 +367,19 @@ public sealed class SymbolIndex
                 symbol);
         }
 
-        public static SyntaxSymbol CreateMethod(MethodDeclarationSyntax node, ISymbol? symbol)
+        public static SyntaxSymbol CreateMethod(MethodDeclarationSyntax node, IMethodSymbol? symbol)
         {
             var parameterTypes = node.ParameterList.Parameters
                 .Select(parameter => parameter.Type?.ToString() ?? "unknown")
                 .ToArray();
 
+            var kind = symbol?.DeclaredAccessibility == Accessibility.Public
+                ? SymbolKind.PublicMethod
+                : SymbolKind.Method;
+
             return new SyntaxSymbol(
                 node,
-                SymbolKind.PublicMethod,
+                kind,
                 node.Identifier.Text,
                 NamespaceHelper.GetNamespace(node),
                 NamespaceHelper.GetContainingTypes(node),
