@@ -6,6 +6,7 @@ namespace ArchIntel.Reports;
 
 public sealed record ScanSummaryReportData(
     ScanCounts Counts,
+    MethodCountTotals MethodCounts,
     int CacheHits,
     int CacheMisses,
     PipelineTiming Durations,
@@ -36,9 +37,16 @@ public static class ScanSummaryReport
             context.ProjectCount,
             context.FailedProjectCount,
             scanData.AnalyzedDocuments);
+        var index = new SymbolIndex(new DocumentFilter(), hashService, cache, context.MaxDegreeOfParallelism);
+        var symbolData = context.PipelineTimer is null
+            ? await index.BuildAsync(context.Solution, context.AnalysisVersion, cancellationToken)
+            : await context.PipelineTimer.TimeIndexSymbolsAsync(
+                () => index.BuildAsync(context.Solution, context.AnalysisVersion, cancellationToken));
+
         var timing = context.PipelineTimer?.ToTiming() ?? new PipelineTiming(0, 0, 0, 0);
         return new ScanSummaryReportData(
             counts,
+            symbolData.GetMethodCountTotals(),
             scanData.CacheHits,
             scanData.CacheMisses,
             timing,

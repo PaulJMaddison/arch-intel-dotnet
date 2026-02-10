@@ -27,8 +27,8 @@ public static class OutputReadmeReport
         builder.AppendLine("## Files");
         builder.AppendLine();
         builder.AppendLine("- `scan.json`: configuration receipt for this run (solution path, version, effective config, projects).");
-        builder.AppendLine("- `scan_summary.json`: scan counts, cache hits/misses, load diagnostics, and timing.");
-        builder.AppendLine("- `namespaces.json`: per-project namespace statistics (named types and public methods).");
+        builder.AppendLine("- `scan_summary.json`: scan counts, method counts (public/total/internal), cache hits/misses, load diagnostics, and timing.");
+        builder.AppendLine("- `namespaces.json`: per-project namespace statistics (named types plus public/total/internal method counts).");
         builder.AppendLine("- `symbols.json`: symbol index of public types/methods for impact analysis.");
         builder.AppendLine("- `projects.json`: project metadata and dependency graph summary (test projects detected by name or test packages).");
         builder.AppendLine("- `packages.json`: package and framework references per project (from csproj PackageReference/FrameworkReference items).");
