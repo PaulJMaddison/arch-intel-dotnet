@@ -41,6 +41,21 @@ arch scan --solution ./MySolution.sln --open
 
 By default, reports are written to `./.archintel` alongside the solution you are analysing.
 
+### Run from source
+Use the CLI project directly when validating local changes:
+
+```bash
+# Build the CLI project
+dotnet build ./src/ArchIntel.Cli/ArchIntel.Cli.csproj -c Release
+
+# Show version/help
+dotnet run --project ./src/ArchIntel.Cli/ArchIntel.Cli.csproj -- --version
+dotnet run --project ./src/ArchIntel.Cli/ArchIntel.Cli.csproj -- --help
+
+# Run a report command against a solution
+dotnet run --project ./src/ArchIntel.Cli/ArchIntel.Cli.csproj -- scan --solution ./MySolution.sln --format both
+```
+
 ## Docs
 - [Getting started](docs/getting-started.md)
 - [Troubleshooting](docs/troubleshooting.md)
@@ -51,6 +66,7 @@ By default, reports are written to `./.archintel` alongside the solution you are
 Run the build scripts from the repo root to restore, build, test, and verify formatting:
 - macOS/Linux: `./build.sh`
 - Windows (PowerShell): `./build.ps1`
+- Windows smoke matrix: `./scripts/smoke.ps1 -Solution ./YourSolution.sln -OutDir ./artifacts/smoke`
 
 ### Config file
 ArchIntel reads configuration from `./.archintel/config.json` by default, or from `--config`.
