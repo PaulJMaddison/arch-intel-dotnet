@@ -153,8 +153,13 @@ public sealed class ReportWriter : IReportWriter
 
             if (format is ReportFormat.Markdown or ReportFormat.Both)
             {
+                var hashService = new DocumentHashService(_fileSystem);
+                var cache = new DocumentCache(new FileCacheStore(_fileSystem, hashService, context.CacheDir));
+                var index = new SymbolIndex(new DocumentFilter(), hashService, cache, context.MaxDegreeOfParallelism);
+                var symbolData = await index.BuildAsync(context.Solution, context.AnalysisVersion, cancellationToken, context.RepoRootPath);
+
                 var mdPath = Path.Combine(outputDirectory, $"{reportFileName}.md");
-                var markdown = ScanReceiptReport.BuildMarkdown(scanData);
+                var markdown = ScanReceiptReport.BuildMarkdown(scanData, symbolData);
                 await _fileSystem.WriteAllTextAsync(mdPath, markdown, cancellationToken);
             }
 

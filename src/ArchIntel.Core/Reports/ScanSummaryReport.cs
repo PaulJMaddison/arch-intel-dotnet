@@ -39,9 +39,9 @@ public static class ScanSummaryReport
             scanData.AnalyzedDocuments);
         var index = new SymbolIndex(new DocumentFilter(), hashService, cache, context.MaxDegreeOfParallelism);
         var symbolData = context.PipelineTimer is null
-            ? await index.BuildAsync(context.Solution, context.AnalysisVersion, cancellationToken)
+            ? await index.BuildAsync(context.Solution, context.AnalysisVersion, cancellationToken, context.RepoRootPath)
             : await context.PipelineTimer.TimeIndexSymbolsAsync(
-                () => index.BuildAsync(context.Solution, context.AnalysisVersion, cancellationToken));
+                () => index.BuildAsync(context.Solution, context.AnalysisVersion, cancellationToken, context.RepoRootPath));
 
         var timing = context.PipelineTimer?.ToTiming() ?? new PipelineTiming(0, 0, 0, 0);
         return new ScanSummaryReportData(

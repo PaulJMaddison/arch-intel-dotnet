@@ -53,7 +53,7 @@ public static class ScanReceiptReport
             projects);
     }
 
-    public static string BuildMarkdown(ScanReceiptReportData data)
+    public static string BuildMarkdown(ScanReceiptReportData data, SymbolIndexData? symbolData = null)
     {
         var builder = new StringBuilder();
         builder.AppendLine("# Scan configuration receipt");
@@ -85,6 +85,13 @@ public static class ScanReceiptReport
             builder.AppendLine($"| {project.Name} | {project.Path} |");
         }
 
+
+        if (symbolData is not null)
+        {
+            AppendTopNamespacesByPublicSurface(builder, symbolData);
+            AppendTopTypesPerNamespace(builder, symbolData);
+        }
+
         return builder.ToString();
     }
 
@@ -98,6 +105,70 @@ public static class ScanReceiptReport
         var path = Path.Combine(outputDirectory, "scan.json");
         var json = JsonSerializer.Serialize(data, JsonOptions);
         await fileSystem.WriteAllTextAsync(path, json, cancellationToken);
+    }
+
+
+    private static void AppendTopNamespacesByPublicSurface(StringBuilder builder, SymbolIndexData symbolData)
+    {
+        builder.AppendLine();
+        builder.AppendLine("## Top namespaces by public surface");
+
+        var flattened = symbolData.Namespaces
+            .SelectMany(project => project.Namespaces.Select(ns => new
+            {
+                project.ProjectName,
+                Namespace = ns.Name,
+                ns.PublicTypeCount,
+                ns.TotalTypeCount,
+                ns.PublicMethodCount,
+                ns.TotalMethodCount
+            }))
+            .OrderByDescending(entry => entry.PublicMethodCount)
+            .ThenByDescending(entry => entry.PublicTypeCount)
+            .ThenByDescending(entry => entry.TotalMethodCount)
+            .ThenBy(entry => entry.ProjectName, StringComparer.Ordinal)
+            .ThenBy(entry => entry.Namespace, StringComparer.Ordinal)
+            .Take(10)
+            .ToArray();
+
+        if (flattened.Length == 0)
+        {
+            builder.AppendLine("- (none)");
+            return;
+        }
+
+        foreach (var entry in flattened)
+        {
+            builder.AppendLine($"- {entry.Namespace} ({entry.ProjectName}) — {entry.PublicTypeCount}/{entry.TotalTypeCount} public types, {entry.PublicMethodCount}/{entry.TotalMethodCount} public methods");
+        }
+    }
+
+    private static void AppendTopTypesPerNamespace(StringBuilder builder, SymbolIndexData symbolData)
+    {
+        builder.AppendLine();
+        builder.AppendLine("## Top types per namespace");
+
+        var namespaces = symbolData.Namespaces
+            .SelectMany(project => project.Namespaces.Select(ns => new { project.ProjectName, Namespace = ns.Name, ns.TopTypes }))
+            .Where(entry => entry.TopTypes.Count > 0)
+            .OrderBy(entry => entry.ProjectName, StringComparer.Ordinal)
+            .ThenBy(entry => entry.Namespace, StringComparer.Ordinal)
+            .ToArray();
+
+        if (namespaces.Length == 0)
+        {
+            builder.AppendLine("- (none)");
+            return;
+        }
+
+        foreach (var entry in namespaces)
+        {
+            builder.AppendLine($"- {entry.Namespace} ({entry.ProjectName})");
+            foreach (var type in entry.TopTypes)
+            {
+                builder.AppendLine($"  - {type.Name} [{type.Visibility}] — {type.PublicMethodCount}/{type.TotalMethodCount} public methods");
+            }
+        }
     }
 
     private static string FormatList(IReadOnlyList<string> values)

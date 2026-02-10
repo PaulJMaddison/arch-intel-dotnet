@@ -91,6 +91,11 @@ public sealed class ScanIntegrationTests
         {
             foreach (var ns in project.GetProperty("Namespaces").EnumerateArray())
             {
+                _ = ns.GetProperty("PublicTypeCount").GetInt32();
+                _ = ns.GetProperty("TotalTypeCount").GetInt32();
+                Assert.True(ns.TryGetProperty("TopTypes", out var topTypes));
+                Assert.Equal(JsonValueKind.Array, topTypes.ValueKind);
+
                 namespacePublicMethodCount += ns.GetProperty("PublicMethodCount").GetInt32();
                 namespaceTotalMethodCount += ns.GetProperty("TotalMethodCount").GetInt32();
                 namespaceInternalMethodCount += ns.GetProperty("InternalMethodCount").GetInt32();
@@ -100,6 +105,19 @@ public sealed class ScanIntegrationTests
         Assert.Equal(namespacePublicMethodCount, summaryPublicMethodCount);
         Assert.Equal(namespaceTotalMethodCount, summaryTotalMethodCount);
         Assert.Equal(namespaceInternalMethodCount, summaryInternalMethodCount);
+
+        var symbolsPath = Path.Combine(outputDir, "symbols.json");
+        using var symbolsDocument = JsonDocument.Parse(File.ReadAllText(symbolsPath));
+        foreach (var symbol in symbolsDocument.RootElement.EnumerateArray())
+        {
+            Assert.True(symbol.TryGetProperty("Visibility", out _));
+            Assert.True(symbol.TryGetProperty("BaseType", out _));
+            Assert.True(symbol.TryGetProperty("Interfaces", out _));
+            Assert.True(symbol.TryGetProperty("PublicMethodCount", out _));
+            Assert.True(symbol.TryGetProperty("TotalMethodCount", out _));
+            Assert.True(symbol.TryGetProperty("Attributes", out _));
+            Assert.True(symbol.TryGetProperty("RelativePath", out _));
+        }
     }
 
     private static async Task<Dictionary<string, string>> RunScanAsync(

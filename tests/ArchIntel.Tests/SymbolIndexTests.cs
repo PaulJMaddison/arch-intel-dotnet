@@ -41,7 +41,9 @@ public sealed class SymbolIndexTests
 
         var alphaNamespaces = data.Namespaces.Single(stats => stats.ProjectName == "Alpha").Namespaces;
         var alphaNamespace = alphaNamespaces.Single(stat => stat.Name == "Alpha");
-        Assert.Equal(1, alphaNamespace.NamedTypeCount);
+        Assert.Equal(1, alphaNamespace.PublicTypeCount);
+        Assert.Equal(1, alphaNamespace.TotalTypeCount);
+        Assert.NotEmpty(alphaNamespace.TopTypes);
         Assert.Equal(1, alphaNamespace.PublicMethodCount);
         Assert.Equal(2, alphaNamespace.TotalMethodCount);
         Assert.Equal(1, alphaNamespace.InternalMethodCount);
@@ -201,6 +203,62 @@ public sealed class SymbolIndexTests
         Assert.Equal(3, apiNamespace.PublicMethodCount);
         Assert.Equal(6, apiNamespace.TotalMethodCount);
         Assert.Equal(3, apiNamespace.InternalMethodCount);
+    }
+
+
+    [Fact]
+    public async Task BuildAsync_EnrichesSymbolMetadataAndRelativePaths_Deterministically()
+    {
+        var workspace = new AdhocWorkspace();
+        var solution = workspace.CurrentSolution;
+
+        var projectId = ProjectId.CreateNewId();
+        solution = solution.AddProject(ProjectInfo.Create(projectId, VersionStamp.Create(), "Api", "Api", LanguageNames.CSharp, filePath: "/repo/src/Api/Api.csproj"));
+
+        solution = solution.AddDocument(
+            DocumentId.CreateNewId(projectId),
+            "Controller.cs",
+            @"using System;
+              namespace Api.Controllers;
+              [ApiController]
+              public class BaseController { public virtual void BaseRun() { } }
+              public interface IRunner { void Run(); }
+              [Authorize]
+              public class OrdersController : BaseController, IRunner
+              {
+                  [HttpGet] public void Run() { }
+                  internal void Hidden() { }
+              }",
+            filePath: "/repo/src/Api/Controller.cs");
+
+        var index = CreateIndex();
+        var first = await index.BuildAsync(solution, "test-version", CancellationToken.None, "/repo");
+        var second = await index.BuildAsync(solution, "test-version", CancellationToken.None, "/repo");
+
+        Assert.Equal(first.Symbols.Select(s => s.SymbolId), second.Symbols.Select(s => s.SymbolId));
+        Assert.Equal(
+            first.Namespaces.SelectMany(project => project.Namespaces).Select(ns => $"{ns.Name}:{string.Join(",", ns.TopTypes.Select(t => t.Name))}"),
+            second.Namespaces.SelectMany(project => project.Namespaces).Select(ns => $"{ns.Name}:{string.Join(",", ns.TopTypes.Select(t => t.Name))}"));
+
+        var type = first.Symbols.Single(symbol => symbol.Kind == "NamedType" && symbol.Name == "OrdersController");
+        Assert.Equal("public", type.Visibility);
+        Assert.Equal("BaseController", type.BaseType);
+        Assert.Contains("IRunner", type.Interfaces);
+        Assert.Equal(1, type.PublicMethodCount);
+        Assert.Equal(2, type.TotalMethodCount);
+        Assert.Contains("Authorize", type.Attributes);
+        Assert.Equal("src/Api/Controller.cs", type.RelativePath);
+
+        var method = first.Symbols.Single(symbol => symbol.Kind == "PublicMethod" && symbol.Name == "Run" && symbol.ContainingType == "OrdersController");
+        Assert.Equal("public", method.Visibility);
+        Assert.Equal("src/Api/Controller.cs", method.RelativePath);
+
+        var apiNamespace = first.Namespaces.Single(n => n.ProjectName == "Api").Namespaces.Single(n => n.Name == "Api.Controllers");
+        Assert.True(apiNamespace.TopTypes.Count <= 10);
+        Assert.Equal(apiNamespace.TopTypes.OrderByDescending(t => t.PublicMethodCount)
+            .ThenByDescending(t => t.TotalMethodCount)
+            .ThenBy(t => t.Name, StringComparer.Ordinal)
+            .ToArray(), apiNamespace.TopTypes.ToArray());
     }
 
     private static SymbolIndex CreateIndex()

@@ -23,9 +23,9 @@ public static class SymbolIndexReport
         var index = new SymbolIndex(new DocumentFilter(), hashService, cache, context.MaxDegreeOfParallelism);
 
         var data = context.PipelineTimer is null
-            ? await index.BuildAsync(context.Solution, context.AnalysisVersion, cancellationToken)
+            ? await index.BuildAsync(context.Solution, context.AnalysisVersion, cancellationToken, context.RepoRootPath)
             : await context.PipelineTimer.TimeIndexSymbolsAsync(
-                () => index.BuildAsync(context.Solution, context.AnalysisVersion, cancellationToken));
+                () => index.BuildAsync(context.Solution, context.AnalysisVersion, cancellationToken, context.RepoRootPath));
 
         var symbolsPath = Path.Combine(outputDirectory, "symbols.json");
         var symbolsJson = JsonSerializer.Serialize(data.Symbols, JsonOptions);
