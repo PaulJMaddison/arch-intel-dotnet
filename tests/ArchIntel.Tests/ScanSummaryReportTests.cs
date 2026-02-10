@@ -63,6 +63,51 @@ public sealed class ScanSummaryReportTests
         Assert.Equal("Warning", loadDiagnostics[0].GetProperty("Kind").GetString());
     }
 
+
+    [Fact]
+    public void ScanReceiptMarkdown_IncludesPublicSurfaceSections()
+    {
+        var data = new ScanReceiptReportData(
+            "scan",
+            "/repo/arch.sln",
+            "v1",
+            "/repo/out",
+            "/repo/cache",
+            1,
+            false,
+            null,
+            null,
+            Array.Empty<string>(),
+            Array.Empty<string>(),
+            new[] { new ScanReceiptProject("App", "src/App/App.csproj") });
+
+        var symbolData = new SymbolIndexData(
+            Array.Empty<SymbolIndexEntry>(),
+            new[]
+            {
+                new ProjectNamespaceStats(
+                    "App",
+                    "p1",
+                    new[]
+                    {
+                        new NamespaceStat(
+                            "App.Api",
+                            1,
+                            1,
+                            2,
+                            3,
+                            1,
+                            new[] { new TopTypeStat("Controller", "public", 2, 3) })
+                    })
+            });
+
+        var markdown = ScanReceiptReport.BuildMarkdown(data, symbolData);
+
+        Assert.Contains("## Top namespaces by public surface", markdown, StringComparison.Ordinal);
+        Assert.Contains("## Top types per namespace", markdown, StringComparison.Ordinal);
+        Assert.Contains("Controller [public]", markdown, StringComparison.Ordinal);
+    }
+
     private static Solution CreateSolutionWithDocument()
     {
         var workspace = new AdhocWorkspace();

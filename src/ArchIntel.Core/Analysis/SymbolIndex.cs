@@ -11,14 +11,29 @@ public sealed record SymbolIndexEntry(
     string Namespace,
     string? ContainingType,
     string ProjectName,
-    string ProjectId);
+    string ProjectId,
+    string Visibility,
+    string? BaseType,
+    IReadOnlyList<string> Interfaces,
+    int PublicMethodCount,
+    int TotalMethodCount,
+    IReadOnlyList<string> Attributes,
+    string? RelativePath);
+
+public sealed record TopTypeStat(
+    string Name,
+    string Visibility,
+    int PublicMethodCount,
+    int TotalMethodCount);
 
 public sealed record NamespaceStat(
     string Name,
-    int NamedTypeCount,
+    int PublicTypeCount,
+    int TotalTypeCount,
     int PublicMethodCount,
     int TotalMethodCount,
-    int InternalMethodCount);
+    int InternalMethodCount,
+    IReadOnlyList<TopTypeStat> TopTypes);
 
 public sealed record ProjectNamespaceStats(
     string ProjectName,
@@ -70,11 +85,13 @@ public sealed class SymbolIndex
     public async Task<SymbolIndexData> BuildAsync(
         Solution solution,
         string analysisVersion,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? repoRootPath = null)
     {
         var symbols = new ConcurrentBag<SymbolIndexEntry>();
         var symbolIds = new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
         var namespaceCounters = new ConcurrentDictionary<(string ProjectId, string Namespace), NamespaceCounter>();
+        var typeCounters = new ConcurrentDictionary<(string ProjectId, string Namespace, string Name), TypeCounter>();
 
         var documents = solution.Projects
             .Where(project => project.Language == LanguageNames.CSharp)
@@ -126,7 +143,30 @@ public sealed class SymbolIndex
                 var namespaceName = string.IsNullOrWhiteSpace(syntaxSymbol.Namespace) ? string.Empty : syntaxSymbol.Namespace;
                 var counterKey = (project.Id.Id.ToString(), namespaceName);
                 var counter = namespaceCounters.GetOrAdd(counterKey, _ => new NamespaceCounter(project.Name, project.Id.Id.ToString(), namespaceName));
-                counter.Increment(syntaxSymbol.Kind);
+                counter.Increment(syntaxSymbol.Kind, syntaxSymbol.Visibility);
+
+                if (syntaxSymbol.Kind == SymbolKind.NamedType && syntaxSymbol.Symbol is INamedTypeSymbol namedType)
+                {
+                    var typeName = namedType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+                    var typeCounterKey = (project.Id.Id.ToString(), namespaceName, typeName);
+                    var typeCounter = typeCounters.GetOrAdd(
+                        typeCounterKey,
+                        _ => new TypeCounter(project.Id.Id.ToString(), namespaceName, typeName, GetVisibility(syntaxSymbol.Symbol.DeclaredAccessibility)));
+                    typeCounter.EnsureVisibility(GetVisibility(syntaxSymbol.Symbol.DeclaredAccessibility));
+                }
+
+                if (syntaxSymbol.Kind is SymbolKind.PublicMethod or SymbolKind.Method && syntaxSymbol.Symbol is IMethodSymbol methodSymbol)
+                {
+                    var typeName = methodSymbol.ContainingType?.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+                    if (!string.IsNullOrWhiteSpace(typeName))
+                    {
+                        var typeCounterKey = (project.Id.Id.ToString(), namespaceName, typeName!);
+                        var typeCounter = typeCounters.GetOrAdd(
+                            typeCounterKey,
+                            _ => new TypeCounter(project.Id.Id.ToString(), namespaceName, typeName!, GetVisibility(methodSymbol.ContainingType?.DeclaredAccessibility ?? Accessibility.NotApplicable)));
+                        typeCounter.IncrementMethod(syntaxSymbol.Kind == SymbolKind.PublicMethod);
+                    }
+                }
 
                 if (!ShouldIncludeInSymbolIndex(syntaxSymbol.Kind))
                 {
@@ -139,7 +179,7 @@ public sealed class SymbolIndex
                     continue;
                 }
 
-                var entry = CreateEntry(syntaxSymbol, project, symbolId);
+                var entry = CreateEntry(syntaxSymbol, project, symbolId, repoRootPath, document.FilePath);
                 symbols.Add(entry);
 
             }
@@ -163,10 +203,23 @@ public sealed class SymbolIndex
                     .OrderBy(counter => counter.Namespace, StringComparer.Ordinal)
                     .Select(counter => new NamespaceStat(
                         string.IsNullOrWhiteSpace(counter.Namespace) ? "(global)" : counter.Namespace,
-                        counter.NamedTypeCount,
+                        counter.PublicTypeCount,
+                        counter.TotalTypeCount,
                         counter.PublicMethodCount,
                         counter.TotalMethodCount,
-                        counter.InternalMethodCount))
+                        counter.InternalMethodCount,
+                        typeCounters.Values
+                            .Where(type => type.ProjectId == counter.ProjectId && type.Namespace == counter.Namespace)
+                            .OrderByDescending(type => type.PublicMethodCount)
+                            .ThenByDescending(type => type.TotalMethodCount)
+                            .ThenBy(type => type.Name, StringComparer.Ordinal)
+                            .Take(10)
+                            .Select(type => new TopTypeStat(
+                                type.Name,
+                                type.Visibility,
+                                type.PublicMethodCount,
+                                type.TotalMethodCount))
+                            .ToArray()))
                     .ToArray()))
             .OrderBy(stats => stats.ProjectName, StringComparer.Ordinal)
             .ThenBy(stats => stats.ProjectId, StringComparer.Ordinal)
@@ -175,11 +228,22 @@ public sealed class SymbolIndex
         return new SymbolIndexData(symbolList, namespaceList);
     }
 
-    private static SymbolIndexEntry CreateEntry(SyntaxSymbol syntaxSymbol, Project project, string symbolId)
+    private static SymbolIndexEntry CreateEntry(
+        SyntaxSymbol syntaxSymbol,
+        Project project,
+        string symbolId,
+        string? repoRootPath,
+        string documentPath)
     {
+        var relativePath = GetSanitizedRelativePath(documentPath, repoRootPath);
         if (syntaxSymbol.Symbol is not null)
         {
             var (symbolNamespace, containingType) = SymbolIdFactory.GetSymbolContainer(syntaxSymbol.Symbol);
+            var visibility = GetVisibility(syntaxSymbol.Symbol.DeclaredAccessibility);
+            var baseType = GetBaseTypeName(syntaxSymbol.Symbol);
+            var interfaces = GetInterfaces(syntaxSymbol.Symbol);
+            var attributes = GetFrameworkAttributes(syntaxSymbol.Symbol);
+            var (publicMethodCount, totalMethodCount) = GetMethodCounts(syntaxSymbol.Symbol);
             return new SymbolIndexEntry(
                 symbolId,
                 syntaxSymbol.Kind.ToString(),
@@ -187,7 +251,14 @@ public sealed class SymbolIndex
                 symbolNamespace,
                 containingType,
                 project.Name,
-                project.Id.Id.ToString());
+                project.Id.Id.ToString(),
+                visibility,
+                baseType,
+                interfaces,
+                publicMethodCount,
+                totalMethodCount,
+                attributes,
+                relativePath);
         }
 
         return new SymbolIndexEntry(
@@ -197,7 +268,14 @@ public sealed class SymbolIndex
             syntaxSymbol.Namespace,
             string.IsNullOrWhiteSpace(syntaxSymbol.ContainingType) ? null : syntaxSymbol.ContainingType,
             project.Name,
-            project.Id.Id.ToString());
+            project.Id.Id.ToString(),
+            "unknown",
+            null,
+            Array.Empty<string>(),
+            0,
+            0,
+            Array.Empty<string>(),
+            relativePath);
     }
 
     private static IEnumerable<SyntaxSymbol> CollectSyntaxSymbols(
@@ -288,20 +366,26 @@ public sealed class SymbolIndex
         public string ProjectName { get; }
         public string ProjectId { get; }
         public string Namespace { get; }
-        public int NamedTypeCount => _namedTypeCount;
+        public int PublicTypeCount => _publicTypeCount;
+        public int TotalTypeCount => _totalTypeCount;
         public int PublicMethodCount => _publicMethodCount;
         public int TotalMethodCount => _totalMethodCount;
         public int InternalMethodCount => _totalMethodCount - _publicMethodCount;
 
-        private int _namedTypeCount;
+        private int _publicTypeCount;
+        private int _totalTypeCount;
         private int _publicMethodCount;
         private int _totalMethodCount;
 
-        public void Increment(SymbolKind kind)
+        public void Increment(SymbolKind kind, string visibility)
         {
             if (kind == SymbolKind.NamedType)
             {
-                Interlocked.Increment(ref _namedTypeCount);
+                Interlocked.Increment(ref _totalTypeCount);
+                if (string.Equals(visibility, "public", StringComparison.Ordinal))
+                {
+                    Interlocked.Increment(ref _publicTypeCount);
+                }
             }
             else if (kind == SymbolKind.PublicMethod)
             {
@@ -315,6 +399,41 @@ public sealed class SymbolIndex
         }
     }
 
+    private sealed class TypeCounter
+    {
+        private int _publicMethodCount;
+        private int _totalMethodCount;
+
+        public TypeCounter(string projectId, string namespaceName, string name, string visibility)
+        {
+            ProjectId = projectId;
+            Namespace = namespaceName;
+            Name = name;
+            Visibility = visibility;
+        }
+
+        public string Name { get; }
+        public string Visibility { get; private set; }
+        public string ProjectId { get; }
+        public string Namespace { get; }
+        public int PublicMethodCount => _publicMethodCount;
+        public int TotalMethodCount => _totalMethodCount;
+
+        public void EnsureVisibility(string visibility)
+        {
+            Visibility = visibility;
+        }
+
+        public void IncrementMethod(bool isPublic)
+        {
+            Interlocked.Increment(ref _totalMethodCount);
+            if (isPublic)
+            {
+                Interlocked.Increment(ref _publicMethodCount);
+            }
+        }
+    }
+
     private enum SymbolKind
     {
         NamedType,
@@ -323,47 +442,47 @@ public sealed class SymbolIndex
     }
 
     private sealed record SyntaxSymbol(
-        SyntaxNode Node,
         SymbolKind Kind,
         string Name,
         string Namespace,
         string? ContainingType,
         IReadOnlyList<string> ParameterTypes,
+        string Visibility,
         ISymbol? Symbol)
     {
         public static SyntaxSymbol CreateNamedType(TypeDeclarationSyntax node, ISymbol? symbol)
         {
             return new SyntaxSymbol(
-                node,
                 SymbolKind.NamedType,
                 node.Identifier.Text,
                 NamespaceHelper.GetNamespace(node),
                 NamespaceHelper.GetContainingTypes(node),
                 Array.Empty<string>(),
+                GetVisibility(symbol?.DeclaredAccessibility ?? Accessibility.NotApplicable),
                 symbol);
         }
 
         public static SyntaxSymbol CreateEnum(EnumDeclarationSyntax node, ISymbol? symbol)
         {
             return new SyntaxSymbol(
-                node,
                 SymbolKind.NamedType,
                 node.Identifier.Text,
                 NamespaceHelper.GetNamespace(node),
                 NamespaceHelper.GetContainingTypes(node),
                 Array.Empty<string>(),
+                GetVisibility(symbol?.DeclaredAccessibility ?? Accessibility.NotApplicable),
                 symbol);
         }
 
         public static SyntaxSymbol CreateDelegate(DelegateDeclarationSyntax node, ISymbol? symbol)
         {
             return new SyntaxSymbol(
-                node,
                 SymbolKind.NamedType,
                 node.Identifier.Text,
                 NamespaceHelper.GetNamespace(node),
                 NamespaceHelper.GetContainingTypes(node),
                 Array.Empty<string>(),
+                GetVisibility(symbol?.DeclaredAccessibility ?? Accessibility.NotApplicable),
                 symbol);
         }
 
@@ -378,14 +497,125 @@ public sealed class SymbolIndex
                 : SymbolKind.Method;
 
             return new SyntaxSymbol(
-                node,
                 kind,
                 node.Identifier.Text,
                 NamespaceHelper.GetNamespace(node),
                 NamespaceHelper.GetContainingTypes(node),
                 parameterTypes,
+                GetVisibility(symbol?.DeclaredAccessibility ?? Accessibility.NotApplicable),
                 symbol);
         }
+    }
+
+    private static string GetVisibility(Accessibility accessibility)
+    {
+        return accessibility switch
+        {
+            Accessibility.Public => "public",
+            Accessibility.Internal => "internal",
+            Accessibility.Private => "private",
+            Accessibility.Protected => "protected",
+            Accessibility.ProtectedOrInternal => "protected_internal",
+            Accessibility.ProtectedAndInternal => "private_protected",
+            _ => "unknown"
+        };
+    }
+
+    private static string? GetBaseTypeName(ISymbol symbol)
+    {
+        if (symbol is not INamedTypeSymbol namedType || namedType.TypeKind == TypeKind.Interface)
+        {
+            return null;
+        }
+
+        var baseType = namedType.BaseType;
+        if (baseType is null || baseType.SpecialType == SpecialType.System_Object)
+        {
+            return null;
+        }
+
+        return baseType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+    }
+
+    private static IReadOnlyList<string> GetInterfaces(ISymbol symbol)
+    {
+        if (symbol is not INamedTypeSymbol namedType)
+        {
+            return Array.Empty<string>();
+        }
+
+        return namedType.Interfaces
+            .Select(i => i.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat))
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<string> GetFrameworkAttributes(ISymbol symbol)
+    {
+        var interesting = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "ApiController",
+            "HttpGet",
+            "HttpPost",
+            "HttpPut",
+            "HttpDelete",
+            "Authorize",
+            "AllowAnonymous",
+            "Route",
+            "FromBody",
+            "FromQuery"
+        };
+
+        return symbol.GetAttributes()
+            .Select(attr => attr.AttributeClass?.Name ?? string.Empty)
+            .Select(name => name.EndsWith("Attribute", StringComparison.Ordinal) ? name[..^9] : name)
+            .Where(name => interesting.Contains(name))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static (int PublicMethodCount, int TotalMethodCount) GetMethodCounts(ISymbol symbol)
+    {
+        if (symbol is not INamedTypeSymbol namedType)
+        {
+            return (0, 0);
+        }
+
+        var publicMethods = 0;
+        var totalMethods = 0;
+        foreach (var member in namedType.GetMembers().OfType<IMethodSymbol>())
+        {
+            if (!IsCountedMethod(member))
+            {
+                continue;
+            }
+
+            totalMethods++;
+            if (member.DeclaredAccessibility == Accessibility.Public)
+            {
+                publicMethods++;
+            }
+        }
+
+        return (publicMethods, totalMethods);
+    }
+
+    private static string? GetSanitizedRelativePath(string? documentPath, string? repoRootPath)
+    {
+        if (string.IsNullOrWhiteSpace(documentPath) || string.IsNullOrWhiteSpace(repoRootPath))
+        {
+            return null;
+        }
+
+        var fullPath = Path.GetFullPath(documentPath);
+        var fullRoot = Path.GetFullPath(repoRootPath);
+        if (!fullPath.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return Path.GetRelativePath(fullRoot, fullPath);
     }
 
     private static class NamespaceHelper

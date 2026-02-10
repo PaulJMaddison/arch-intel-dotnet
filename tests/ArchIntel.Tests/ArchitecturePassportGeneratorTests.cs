@@ -53,6 +53,8 @@ public sealed class ArchitecturePassportGeneratorTests
         Assert.Contains("ASP.NET Core", output, StringComparison.Ordinal);
         Assert.Contains("Entity Framework Core", output, StringComparison.Ordinal);
         Assert.Contains("Serilog", output, StringComparison.Ordinal);
+        Assert.Contains("## Top namespaces by public surface", output, StringComparison.Ordinal);
+        Assert.Contains("## Top types per namespace", output, StringComparison.Ordinal);
     }
 
     private static async Task<string> BuildPassportAsync(Solution solution)
