@@ -12,6 +12,21 @@ arch scan --solution ./YourSolution.sln
 
 By default, outputs go to `./.archintel` next to the solution.
 
+## Run from source (optional)
+If you are working from this repo instead of a release bundle:
+
+```bash
+dotnet run --project ./src/ArchIntel.Cli/ArchIntel.Cli.csproj -- --version
+dotnet run --project ./src/ArchIntel.Cli/ArchIntel.Cli.csproj -- --help
+dotnet run --project ./src/ArchIntel.Cli/ArchIntel.Cli.csproj -- scan --solution ./YourSolution.sln
+```
+
+For a quick command matrix on Windows PowerShell:
+
+```powershell
+./scripts/smoke.ps1 -Solution ./YourSolution.sln -OutDir ./artifacts/smoke
+```
+
 ## 3) Inspect outputs
 The output folder contains:
 - `scan.json` (config receipt)

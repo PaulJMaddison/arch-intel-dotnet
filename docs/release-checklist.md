@@ -3,8 +3,8 @@
 ## Pre-release
 - Ensure CI is green on `main`.
 - Run locally:
-  - `dotnet build -c Release`
-  - `dotnet test -c Release`
+  - `dotnet build ./src/ArchIntel.Cli/ArchIntel.Cli.csproj -c Release`
+  - `dotnet test ./tests/ArchIntel.Tests/ArchIntel.Tests.csproj -c Release`
 - Confirm documentation and README examples are up to date.
 - Confirm version numbers are set for the target release (e.g., `0.1.0`, `0.2.0`).
 
@@ -14,6 +14,7 @@
   - Bash: `./scripts/publish.sh`
 - Verify the output zip in `./releases/archintel-v<version>-win-x64.zip`.
 - Smoke test by running `arch --version` from the published output.
+- Run the source-based smoke matrix (PowerShell): `./scripts/smoke.ps1 -Solution ./tests/TestData/SampleSolution/ArchIntel.TestData.sln -OutDir ./artifacts/smoke`.
 
 ## Tag + publish
 - Create a signed tag: `git tag -a v0.1.0 -m "v0.1.0"` (adjust version).
