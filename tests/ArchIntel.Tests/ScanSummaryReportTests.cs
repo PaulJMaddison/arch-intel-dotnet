@@ -79,7 +79,8 @@ public sealed class ScanSummaryReportTests
             null,
             Array.Empty<string>(),
             Array.Empty<string>(),
-            new[] { new ScanReceiptProject("App", "src/App/App.csproj") });
+            new[] { new ScanReceiptProject("App", "src/App/App.csproj") },
+            InsightsReport.DeterministicRules);
 
         var symbolData = new SymbolIndexData(
             Array.Empty<SymbolIndexEntry>(),

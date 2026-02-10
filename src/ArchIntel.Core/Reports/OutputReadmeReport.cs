@@ -32,6 +32,7 @@ public static class OutputReadmeReport
         builder.AppendLine("- `symbols.json`: symbol index of public types/methods for impact analysis.");
         builder.AppendLine("- `projects.json`: project metadata and dependency graph summary (test projects detected by name or test packages).");
         builder.AppendLine("- `packages.json`: package and framework references per project (from csproj PackageReference/FrameworkReference items).");
+        builder.AppendLine("- `insights.json` / `insights.md`: derived architecture insights (fan-in/out leaders, core/risky projects, cycle severity, namespace surface, package drift hotspots).");
         builder.AppendLine("- `*.json` / `*.md`: report-specific outputs (e.g., `impact.json`, `violations.json`, `project_graph.json`).");
         builder.AppendLine();
         builder.AppendLine("## Using with AI tools");
