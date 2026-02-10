@@ -34,26 +34,13 @@ public static class DocumentationCaptureReport
     {
         var repoRoot = context.RepoRootPath;
         var documents = new List<DocumentationFileEntry>();
+        var hashService = new DocumentHashService(fileSystem);
 
-        var readmePath = FindReadme(repoRoot);
-        if (readmePath is not null)
+        foreach (var filePath in DiscoverDocumentationFiles(repoRoot))
         {
-            var entry = await BuildEntryAsync(repoRoot, readmePath, includeSnippets, fileSystem, cancellationToken);
+            var entry = await BuildEntryAsync(repoRoot, filePath, includeSnippets, fileSystem, hashService, cancellationToken);
             documents.Add(entry);
         }
-
-        var docsDirectory = Path.Combine(repoRoot, "docs");
-        if (Directory.Exists(docsDirectory))
-        {
-            foreach (var file in Directory.EnumerateFiles(docsDirectory, "*.md", SearchOption.TopDirectoryOnly)
-                         .OrderBy(path => path, StringComparer.Ordinal))
-            {
-                var entry = await BuildEntryAsync(repoRoot, file, includeSnippets, fileSystem, cancellationToken);
-                documents.Add(entry);
-            }
-        }
-
-        documents.Sort((left, right) => StringComparer.Ordinal.Compare(left.Path, right.Path));
 
         var directoryBuildProps = File.Exists(Path.Combine(repoRoot, "Directory.Build.props"));
         var directoryBuildTargets = File.Exists(Path.Combine(repoRoot, "Directory.Build.targets"));
@@ -68,9 +55,9 @@ public static class DocumentationCaptureReport
 
         return new DocumentationCaptureData(
             documents,
+            new DocumentationCaptureSummary(documents.Count, includeSnippets),
             new BuildFilePresence(directoryBuildProps, directoryBuildTargets),
-            new TopLevelSummary(topLevelDirectories),
-            includeSnippets);
+            new TopLevelSummary(topLevelDirectories));
     }
 
     internal static IReadOnlyList<string> ExtractHeadings(string content, int maxHeadings)
@@ -108,29 +95,89 @@ public static class DocumentationCaptureReport
         string filePath,
         bool includeSnippets,
         IFileSystem fileSystem,
+        DocumentHashService hashService,
         CancellationToken cancellationToken)
     {
         var content = await fileSystem.ReadAllTextAsync(filePath, cancellationToken);
-        var headings = ExtractHeadings(content, MaxHeadingCount);
+        var normalizedContent = NormalizeLineEndings(content);
+        var headings = ExtractHeadings(normalizedContent, MaxHeadingCount);
+        var title = headings.Count > 0 ? headings[0] : Path.GetFileNameWithoutExtension(filePath);
         var wordCount = WordRegex.Matches(content).Count;
         var snippet = includeSnippets
             ? content[..Math.Min(SnippetCharacterLimit, content.Length)]
             : null;
         var relativePath = NormalizePath(Path.GetRelativePath(repoRoot, filePath));
+        var contentHash = hashService.GetContentHash(normalizedContent);
 
-        return new DocumentationFileEntry(relativePath, wordCount, headings, snippet);
+        return new DocumentationFileEntry(relativePath, title, wordCount, contentHash, snippet);
     }
 
-    private static string? FindReadme(string repoRoot)
+    private static IReadOnlyList<string> DiscoverDocumentationFiles(string repoRoot)
     {
+        var candidates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var readmePath = Path.Combine(repoRoot, "README.md");
         if (File.Exists(readmePath))
         {
-            return readmePath;
+            candidates.Add(Path.GetFullPath(readmePath));
         }
 
-        return Directory.EnumerateFiles(repoRoot, "README.*", SearchOption.TopDirectoryOnly)
-            .FirstOrDefault(path => string.Equals(Path.GetFileName(path), "README.md", StringComparison.OrdinalIgnoreCase));
+        var changelogPath = Path.Combine(repoRoot, "CHANGELOG.md");
+        if (File.Exists(changelogPath))
+        {
+            candidates.Add(Path.GetFullPath(changelogPath));
+        }
+
+        var docsDirectory = Path.Combine(repoRoot, "docs");
+        if (Directory.Exists(docsDirectory))
+        {
+            foreach (var file in Directory.EnumerateFiles(docsDirectory, "*.md", SearchOption.AllDirectories))
+            {
+                candidates.Add(Path.GetFullPath(file));
+            }
+
+            var adrDirectory = Path.Combine(docsDirectory, "adr");
+            if (Directory.Exists(adrDirectory))
+            {
+                foreach (var file in Directory.EnumerateFiles(adrDirectory, "*", SearchOption.AllDirectories))
+                {
+                    candidates.Add(Path.GetFullPath(file));
+                }
+            }
+        }
+
+        foreach (var markdownFile in Directory.EnumerateFiles(repoRoot, "*.md", SearchOption.AllDirectories))
+        {
+            if (IsArchitectureConventionFile(markdownFile))
+            {
+                candidates.Add(Path.GetFullPath(markdownFile));
+            }
+        }
+
+        return candidates
+            .Select(path => new
+            {
+                FullPath = path,
+                RelativePath = NormalizePath(Path.GetRelativePath(repoRoot, path))
+            })
+            .OrderBy(entry => entry.RelativePath, StringComparer.Ordinal)
+            .Select(entry => entry.FullPath)
+            .ToArray();
+    }
+
+    private static bool IsArchitectureConventionFile(string markdownPath)
+    {
+        var fileName = Path.GetFileNameWithoutExtension(markdownPath);
+        return fileName.Contains("architecture", StringComparison.OrdinalIgnoreCase)
+            || fileName.Contains("architectural", StringComparison.OrdinalIgnoreCase)
+            || fileName.Contains("design", StringComparison.OrdinalIgnoreCase)
+            || fileName.Contains("adr", StringComparison.OrdinalIgnoreCase)
+            || fileName.Contains("decision", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeLineEndings(string content)
+    {
+        return content.Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace("\r", "\n", StringComparison.Ordinal);
     }
 
     private static string NormalizePath(string path) => path.Replace('\\', '/');
@@ -138,15 +185,18 @@ public static class DocumentationCaptureReport
 
 public sealed record DocumentationCaptureData(
     IReadOnlyList<DocumentationFileEntry> Documents,
+    DocumentationCaptureSummary Summary,
     BuildFilePresence BuildFiles,
-    TopLevelSummary TopLevel,
-    bool IncludeSnippets);
+    TopLevelSummary TopLevel);
 
 public sealed record DocumentationFileEntry(
-    string Path,
+    string RelativePath,
+    string Title,
     int WordCount,
-    IReadOnlyList<string> Headings,
+    string ContentHash,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Snippet);
+
+public sealed record DocumentationCaptureSummary(int AnalyzedDocuments, bool IncludeSnippets);
 
 public sealed record BuildFilePresence(bool DirectoryBuildProps, bool DirectoryBuildTargets);
 
