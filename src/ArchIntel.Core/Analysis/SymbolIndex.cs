@@ -17,8 +17,6 @@ public sealed record SymbolIndexEntry(
     string? BaseType,
     IReadOnlyList<string> Interfaces,
     int DeclaredPublicMethodCount,
-    int DeprecatedPublicMethodCount,
-    int PublicMethodCount,
     int PubliclyReachableMethodCount,
     int TotalMethodCount,
     IReadOnlyList<string> Attributes,
@@ -28,8 +26,6 @@ public sealed record TopTypeStat(
     string Name,
     string Visibility,
     int DeclaredPublicMethodCount,
-    int DeprecatedPublicMethodCount,
-    int PublicMethodCount,
     int PubliclyReachableMethodCount,
     int TotalMethodCount);
 
@@ -38,8 +34,6 @@ public sealed record NamespaceStat(
     int PublicTypeCount,
     int TotalTypeCount,
     int DeclaredPublicMethodCount,
-    int DeprecatedPublicMethodCount,
-    int PublicMethodCount,
     int PubliclyReachableMethodCount,
     int TotalMethodCount,
     int InternalMethodCount,
@@ -49,6 +43,7 @@ public sealed record ProjectNamespaceStats(
     string ProjectName,
     string ProjectId,
     string RoslynProjectId,
+    string ProjectPath,
     IReadOnlyList<NamespaceStat> Namespaces);
 
 public sealed record SymbolIndexData(
@@ -59,14 +54,12 @@ public sealed record SymbolIndexData(
     {
         var declaredPublicMethodCount = 0;
         var publiclyReachableMethodCount = 0;
-        var publicMethodCount = 0;
         var totalMethodCount = 0;
         var internalMethodCount = 0;
 
         foreach (var ns in Namespaces.SelectMany(project => project.Namespaces))
         {
             declaredPublicMethodCount += ns.DeclaredPublicMethodCount;
-            publicMethodCount += ns.PublicMethodCount;
             publiclyReachableMethodCount += ns.PubliclyReachableMethodCount;
             totalMethodCount += ns.TotalMethodCount;
             internalMethodCount += ns.InternalMethodCount;
@@ -74,8 +67,6 @@ public sealed record SymbolIndexData(
 
         return new MethodCountTotals(
             declaredPublicMethodCount,
-            declaredPublicMethodCount,
-            publicMethodCount,
             publiclyReachableMethodCount,
             totalMethodCount,
             internalMethodCount);
@@ -83,12 +74,10 @@ public sealed record SymbolIndexData(
 }
 
 public sealed record MethodCountTotals(
-    int DeclaredPublicMethodCount,
-    int DeprecatedPublicMethodCount,
-    int PublicMethodCount,
-    int PubliclyReachableMethodCount,
-    int TotalMethodCount,
-    int InternalMethodCount);
+    int DeclaredPublicMethodsTotal,
+    int PubliclyReachableMethodsTotal,
+    int TotalMethodsTotal,
+    int InternalMethodsTotal);
 
 public sealed class SymbolIndex
 {
@@ -115,7 +104,7 @@ public sealed class SymbolIndex
         CancellationToken cancellationToken,
         string? repoRootPath = null)
     {
-        var projectIdMap = solution.Projects.ToDictionary(p => p.Id, p => ProjectIdentity.CreateStableId(p, repoRootPath ?? Directory.GetCurrentDirectory()));
+        var projectIdentityMap = solution.Projects.ToDictionary(p => p.Id, p => ProjectIdentity.Create(p, repoRootPath ?? Directory.GetCurrentDirectory()));
         var symbols = new ConcurrentBag<SymbolIndexEntry>();
         var symbolIds = new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
         var namespaceCounters = new ConcurrentDictionary<(string ProjectId, string Namespace), NamespaceCounter>();
@@ -149,7 +138,7 @@ public sealed class SymbolIndex
             var contentHash = _hashService.GetContentHash(text.ToString());
             var cacheKey = new CacheKey(
                 analysisVersion,
-                projectIdMap[project.Id],
+                projectIdentityMap[project.Id].ProjectId,
                 Path.GetFullPath(document.FilePath),
                 contentHash);
             _ = await _cache.GetStatusAsync(cacheKey, token);
@@ -169,17 +158,17 @@ public sealed class SymbolIndex
             foreach (var syntaxSymbol in CollectSyntaxSymbols(root, semanticModel, token))
             {
                 var namespaceName = string.IsNullOrWhiteSpace(syntaxSymbol.Namespace) ? string.Empty : syntaxSymbol.Namespace;
-                var counterKey = (projectIdMap[project.Id], namespaceName);
-                var counter = namespaceCounters.GetOrAdd(counterKey, _ => new NamespaceCounter(project.Name, projectIdMap[project.Id], project.Id.Id.ToString(), namespaceName));
+                var counterKey = (projectIdentityMap[project.Id].ProjectId, namespaceName);
+                var counter = namespaceCounters.GetOrAdd(counterKey, _ => new NamespaceCounter(project.Name, projectIdentityMap[project.Id].ProjectId, projectIdentityMap[project.Id].RoslynProjectId, projectIdentityMap[project.Id].ProjectPath, namespaceName));
                 counter.Increment(syntaxSymbol.Kind, syntaxSymbol.Visibility);
 
                 if (syntaxSymbol.Kind == SymbolKind.NamedType && syntaxSymbol.Symbol is INamedTypeSymbol namedType)
                 {
                     var typeName = namedType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
-                    var typeCounterKey = (projectIdMap[project.Id], namespaceName, typeName);
+                    var typeCounterKey = (projectIdentityMap[project.Id].ProjectId, namespaceName, typeName);
                     var typeCounter = typeCounters.GetOrAdd(
                         typeCounterKey,
-                        _ => new TypeCounter(projectIdMap[project.Id], namespaceName, typeName, GetVisibility(syntaxSymbol.Symbol.DeclaredAccessibility)));
+                        _ => new TypeCounter(projectIdentityMap[project.Id].ProjectId, namespaceName, typeName, GetVisibility(syntaxSymbol.Symbol.DeclaredAccessibility)));
                     typeCounter.EnsureVisibility(GetVisibility(syntaxSymbol.Symbol.DeclaredAccessibility));
                 }
 
@@ -191,10 +180,10 @@ public sealed class SymbolIndex
                     var typeName = methodSymbol.ContainingType?.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
                     if (!string.IsNullOrWhiteSpace(typeName))
                     {
-                        var typeCounterKey = (projectIdMap[project.Id], namespaceName, typeName!);
+                        var typeCounterKey = (projectIdentityMap[project.Id].ProjectId, namespaceName, typeName!);
                         var typeCounter = typeCounters.GetOrAdd(
                             typeCounterKey,
-                            _ => new TypeCounter(projectIdMap[project.Id], namespaceName, typeName!, GetVisibility(methodSymbol.ContainingType?.DeclaredAccessibility ?? Accessibility.NotApplicable)));
+                            _ => new TypeCounter(projectIdentityMap[project.Id].ProjectId, namespaceName, typeName!, GetVisibility(methodSymbol.ContainingType?.DeclaredAccessibility ?? Accessibility.NotApplicable)));
                         typeCounter.IncrementMethod(
                             syntaxSymbol.Kind == SymbolKind.PublicMethod,
                             isPubliclyReachableMethod);
@@ -206,14 +195,14 @@ public sealed class SymbolIndex
                     continue;
                 }
 
-                var canonicalProjectId = projectIdMap[project.Id];
+                var canonicalProjectId = projectIdentityMap[project.Id].ProjectId;
                 var symbolId = SymbolIdFactory.Create(syntaxSymbol.Symbol, syntaxSymbol, canonicalProjectId);
                 if (!symbolIds.TryAdd(symbolId, 0))
                 {
                     continue;
                 }
 
-                var entry = CreateEntry(syntaxSymbol, project, symbolId, canonicalProjectId, project.Id.Id.ToString(), repoRootPath, document.FilePath);
+                var entry = CreateEntry(syntaxSymbol, project, symbolId, canonicalProjectId, projectIdentityMap[project.Id].RoslynProjectId, repoRootPath, document.FilePath);
                 symbols.Add(entry);
 
             }
@@ -229,11 +218,12 @@ public sealed class SymbolIndex
             .ToArray();
 
         var namespaceList = namespaceCounters.Values
-            .GroupBy(counter => new ProjectKey(counter.ProjectId, counter.RoslynProjectId, counter.ProjectName))
+            .GroupBy(counter => new ProjectKey(counter.ProjectId, counter.RoslynProjectId, counter.ProjectName, counter.ProjectPath))
             .Select(group => new ProjectNamespaceStats(
                 group.Key.ProjectName,
                 group.Key.ProjectId,
                 group.Key.RoslynProjectId,
+                group.Key.ProjectPath,
                 group
                     .OrderBy(counter => counter.Namespace, StringComparer.Ordinal)
                     .Select(counter => new NamespaceStat(
@@ -241,23 +231,18 @@ public sealed class SymbolIndex
                         counter.PublicTypeCount,
                         counter.TotalTypeCount,
                         counter.DeclaredPublicMethodCount,
-                        counter.DeprecatedPublicMethodCount,
-                        counter.PublicMethodCount,
                         counter.PubliclyReachableMethodCount,
                         counter.TotalMethodCount,
                         counter.InternalMethodCount,
                         typeCounters.Values
                             .Where(type => type.ProjectId == counter.ProjectId && type.Namespace == counter.Namespace)
-                            .OrderByDescending(type => type.PublicMethodCount)
-                            .ThenByDescending(type => type.TotalMethodCount)
+                            .OrderByDescending(type => type.DeclaredPublicMethodCount)
                             .ThenBy(type => type.Name, StringComparer.Ordinal)
                             .Take(10)
                             .Select(type => new TopTypeStat(
                                 type.Name,
                                 type.Visibility,
                                 type.DeclaredPublicMethodCount,
-                                type.DeprecatedPublicMethodCount,
-                                type.PublicMethodCount,
                                 type.PubliclyReachableMethodCount,
                                 type.TotalMethodCount))
                             .ToArray()))
@@ -300,8 +285,6 @@ public sealed class SymbolIndex
                 baseType,
                 interfaces,
                 declaredPublicMethodCount,
-                declaredPublicMethodCount,
-                declaredPublicMethodCount,
                 publiclyReachableMethodCount,
                 totalMethodCount,
                 attributes,
@@ -320,8 +303,6 @@ public sealed class SymbolIndex
             "unknown",
             null,
             Array.Empty<string>(),
-            0,
-            0,
             0,
             0,
             0,
@@ -403,27 +384,27 @@ public sealed class SymbolIndex
         return kind is SymbolKind.NamedType or SymbolKind.PublicMethod;
     }
 
-    private readonly record struct ProjectKey(string ProjectId, string RoslynProjectId, string ProjectName);
+    private readonly record struct ProjectKey(string ProjectId, string RoslynProjectId, string ProjectName, string ProjectPath);
 
     private sealed class NamespaceCounter
     {
-        public NamespaceCounter(string projectName, string projectId, string roslynProjectId, string namespaceName)
+        public NamespaceCounter(string projectName, string projectId, string roslynProjectId, string projectPath, string namespaceName)
         {
             ProjectName = projectName;
             ProjectId = projectId;
             Namespace = namespaceName;
             RoslynProjectId = roslynProjectId;
+            ProjectPath = projectPath;
         }
 
         public string ProjectName { get; }
         public string ProjectId { get; }
+        public string ProjectPath { get; }
         public string Namespace { get; }
         public string RoslynProjectId { get; }
         public int PublicTypeCount => _publicTypeCount;
         public int TotalTypeCount => _totalTypeCount;
         public int DeclaredPublicMethodCount => _declaredPublicMethodCount;
-        public int DeprecatedPublicMethodCount => _declaredPublicMethodCount;
-        public int PublicMethodCount => _declaredPublicMethodCount;
         public int PubliclyReachableMethodCount => _publiclyReachableMethodCount;
         public int TotalMethodCount => _totalMethodCount;
         public int InternalMethodCount => _totalMethodCount - _declaredPublicMethodCount;
@@ -483,8 +464,6 @@ public sealed class SymbolIndex
         public string ProjectId { get; }
         public string Namespace { get; }
         public int DeclaredPublicMethodCount => _declaredPublicMethodCount;
-        public int DeprecatedPublicMethodCount => _declaredPublicMethodCount;
-        public int PublicMethodCount => _declaredPublicMethodCount;
         public int PubliclyReachableMethodCount => _publiclyReachableMethodCount;
         public int TotalMethodCount => _totalMethodCount;
 

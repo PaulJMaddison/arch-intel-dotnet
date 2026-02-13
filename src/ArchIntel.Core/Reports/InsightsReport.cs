@@ -14,7 +14,7 @@ public sealed record InsightsCycleMetric(
     int TotalFanOut,
     int SeverityScore);
 
-public sealed record InsightsNamespaceMetric(string Namespace, int PublicTypeCount, int PublicMethodCount, int TotalMethodCount, int Score);
+public sealed record InsightsNamespaceMetric(string Namespace, int PublicTypeCount, int DeclaredPublicMethodCount, int TotalMethodCount, int Score);
 
 public sealed record InsightsPackageDriftHotspot(
     string PackageId,
@@ -172,10 +172,10 @@ public static class InsightsReport
             .Select(group =>
             {
                 var publicTypeCount = group.Sum(item => item.PublicTypeCount);
-                var publicMethodCount = group.Sum(item => item.PublicMethodCount);
+                var declaredPublicMethodCount = group.Sum(item => item.DeclaredPublicMethodCount);
                 var totalMethodCount = group.Sum(item => item.TotalMethodCount);
-                var score = (publicMethodCount * 4) + (publicTypeCount * 2) + totalMethodCount;
-                return new InsightsNamespaceMetric(group.Key, publicTypeCount, publicMethodCount, totalMethodCount, score);
+                var score = (declaredPublicMethodCount * 4) + (publicTypeCount * 2) + totalMethodCount;
+                return new InsightsNamespaceMetric(group.Key, publicTypeCount, declaredPublicMethodCount, totalMethodCount, score);
             })
             .Where(metric => !string.IsNullOrWhiteSpace(metric.Namespace))
             .OrderByDescending(metric => metric.Score)

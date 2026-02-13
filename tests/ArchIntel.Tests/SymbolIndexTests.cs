@@ -45,19 +45,15 @@ public sealed class SymbolIndexTests
         Assert.Equal(1, alphaNamespace.TotalTypeCount);
         Assert.NotEmpty(alphaNamespace.TopTypes);
         Assert.Equal(1, alphaNamespace.DeclaredPublicMethodCount);
-        Assert.Equal(1, alphaNamespace.DeprecatedPublicMethodCount);
-        Assert.Equal(1, alphaNamespace.PublicMethodCount);
         Assert.Equal(1, alphaNamespace.PubliclyReachableMethodCount);
         Assert.Equal(2, alphaNamespace.TotalMethodCount);
         Assert.Equal(1, alphaNamespace.InternalMethodCount);
 
         var methodTotals = data.GetMethodCountTotals();
-        Assert.Equal(2, methodTotals.DeclaredPublicMethodCount);
-        Assert.Equal(2, methodTotals.DeprecatedPublicMethodCount);
-        Assert.Equal(2, methodTotals.PublicMethodCount);
-        Assert.Equal(2, methodTotals.PubliclyReachableMethodCount);
-        Assert.Equal(3, methodTotals.TotalMethodCount);
-        Assert.Equal(1, methodTotals.InternalMethodCount);
+        Assert.Equal(2, methodTotals.DeclaredPublicMethodsTotal);
+        Assert.Equal(2, methodTotals.PubliclyReachableMethodsTotal);
+        Assert.Equal(3, methodTotals.TotalMethodsTotal);
+        Assert.Equal(1, methodTotals.InternalMethodsTotal);
     }
 
     [Fact]
@@ -207,7 +203,6 @@ public sealed class SymbolIndexTests
         var namespaces = data.Namespaces.Single(stats => stats.ProjectName == "Delta").Namespaces;
         var apiNamespace = namespaces.Single(stat => stat.Name == "Delta.Api");
         Assert.Equal(3, apiNamespace.DeclaredPublicMethodCount);
-        Assert.Equal(3, apiNamespace.PublicMethodCount);
         Assert.Equal(3, apiNamespace.PubliclyReachableMethodCount);
         Assert.Equal(6, apiNamespace.TotalMethodCount);
         Assert.Equal(3, apiNamespace.InternalMethodCount);
@@ -298,8 +293,7 @@ public sealed class SymbolIndexTests
 
         var apiNamespace = first.Namespaces.Single(n => n.ProjectName == "Api").Namespaces.Single(n => n.Name == "Api.Controllers");
         Assert.True(apiNamespace.TopTypes.Count <= 10);
-        Assert.Equal(apiNamespace.TopTypes.OrderByDescending(t => t.PublicMethodCount)
-            .ThenByDescending(t => t.TotalMethodCount)
+        Assert.Equal(apiNamespace.TopTypes.OrderByDescending(t => t.DeclaredPublicMethodCount)
             .ThenBy(t => t.Name, StringComparer.Ordinal)
             .ToArray(), apiNamespace.TopTypes.ToArray());
     }
