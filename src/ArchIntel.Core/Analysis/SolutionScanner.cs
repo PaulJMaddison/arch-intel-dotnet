@@ -27,6 +27,7 @@ public sealed class SolutionScanner
         var hits = 0;
         var misses = 0;
 
+        var projectIdMap = context.Solution.Projects.ToDictionary(project => project.Id, project => ProjectIdentity.CreateStableId(project, context.RepoRootPath));
         var documents = context.Solution.Projects
             .SelectMany(project => project.Documents.Select(document => (Project: project, Document: document)));
 
@@ -54,7 +55,7 @@ public sealed class SolutionScanner
             var contentHash = _hashService.GetContentHash(text.ToString());
             var key = new CacheKey(
                 context.AnalysisVersion,
-                item.Project.Id.Id.ToString(),
+                projectIdMap[item.Project.Id],
                 Path.GetFullPath(document.FilePath),
                 contentHash);
 

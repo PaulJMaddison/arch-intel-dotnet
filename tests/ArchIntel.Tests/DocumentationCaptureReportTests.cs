@@ -54,10 +54,8 @@ public sealed class DocumentationCaptureReportTests
             "CHANGELOG.md",
             "README.md",
             "docs/adr/0001-record.md",
-            "docs/adr/decision-log.txt",
             "docs/guide/setup.md",
-            "docs/intro.md",
-            "notes/system-design.md"
+            "docs/intro.md"
         };
 
         Assert.Equal(expectedPaths, first.Documents.Select(document => document.RelativePath).ToArray());
@@ -72,12 +70,6 @@ public sealed class DocumentationCaptureReportTests
         Assert.True(readme.WordCount > 0);
         Assert.Null(readme.Snippet);
 
-        var adrTextFile = first.Documents.Single(document => document.RelativePath == "docs/adr/decision-log.txt");
-        Assert.Equal("decision-log", adrTextFile.Title);
-
-        var designDoc = first.Documents.Single(document => document.RelativePath == "notes/system-design.md");
-        var expectedDesignHash = new DocumentHashService(new PhysicalFileSystem()).GetContentHash("# System Design\nLine two.\n");
-        Assert.Equal(expectedDesignHash, designDoc.ContentHash);
     }
 
     private static AnalysisContext CreateContext(string repoRoot, bool includeSnippets)

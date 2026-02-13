@@ -61,7 +61,7 @@ public static class InsightsReport
 
     public static InsightsReportData Create(AnalysisContext context, SymbolIndexData symbolData)
     {
-        var graph = ProjectGraphBuilder.Build(context.Solution, context.RepoRootPath);
+        var graph = ProjectGraphBuilder.Build(context.Solution, context.RepoRootPath, context.Config);
         var packages = PackagesReport.Create(context);
 
         var nameById = graph.Nodes.ToDictionary(node => node.Id, node => node.Name, StringComparer.Ordinal);

@@ -3,7 +3,7 @@ using System.Linq;
 
 namespace ArchIntel.Analysis;
 
-public sealed record ProjectNode(string Id, string Name, string Path, string Layer);
+public sealed record ProjectNode(string Id, string Name, string Path, string Layer, string LayerReason, string? LayerRuleMatched, string RoslynProjectId, bool IsTestProject, string TestDetectionReason);
 
 public sealed record ProjectEdge(string FromId, string ToId);
 

@@ -88,6 +88,7 @@ internal static class Program
                 reportKind,
                 symbol,
                 openOutput,
+                BuildCliInvocation(context.ParseResult),
                 CancellationToken.None);
         }
 
@@ -178,4 +179,11 @@ internal static class Program
             return ExitCodes.UnexpectedError;
         }
     }
+
+    private static string BuildCliInvocation(ParseResult parseResult)
+    {
+        var tokens = parseResult.Tokens.Select(token => token.Value).ToArray();
+        return tokens.Length == 0 ? "arch" : $"arch {string.Join(' ', tokens)}";
+    }
+
 }

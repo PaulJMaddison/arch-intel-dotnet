@@ -35,9 +35,9 @@ public sealed class ArchitecturePassportGenerator
     public async Task<string> BuildAsync(AnalysisContext context, CancellationToken cancellationToken)
     {
         var graph = context.PipelineTimer is null
-            ? ProjectGraphBuilder.Build(context.Solution, context.RepoRootPath)
+            ? ProjectGraphBuilder.Build(context.Solution, context.RepoRootPath, context.Config)
             : context.PipelineTimer.TimeBuildProjectGraph(
-                () => ProjectGraphBuilder.Build(context.Solution, context.RepoRootPath));
+                () => ProjectGraphBuilder.Build(context.Solution, context.RepoRootPath, context.Config));
 
         var hashService = new DocumentHashService(_fileSystem);
         var cache = new DocumentCache(_cacheStore);

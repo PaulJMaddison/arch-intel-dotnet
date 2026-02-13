@@ -135,22 +135,6 @@ public static class DocumentationCaptureReport
                 candidates.Add(Path.GetFullPath(file));
             }
 
-            var adrDirectory = Path.Combine(docsDirectory, "adr");
-            if (Directory.Exists(adrDirectory))
-            {
-                foreach (var file in Directory.EnumerateFiles(adrDirectory, "*", SearchOption.AllDirectories))
-                {
-                    candidates.Add(Path.GetFullPath(file));
-                }
-            }
-        }
-
-        foreach (var markdownFile in Directory.EnumerateFiles(repoRoot, "*.md", SearchOption.AllDirectories))
-        {
-            if (IsArchitectureConventionFile(markdownFile))
-            {
-                candidates.Add(Path.GetFullPath(markdownFile));
-            }
         }
 
         return candidates
@@ -162,16 +146,6 @@ public static class DocumentationCaptureReport
             .OrderBy(entry => entry.RelativePath, StringComparer.Ordinal)
             .Select(entry => entry.FullPath)
             .ToArray();
-    }
-
-    private static bool IsArchitectureConventionFile(string markdownPath)
-    {
-        var fileName = Path.GetFileNameWithoutExtension(markdownPath);
-        return fileName.Contains("architecture", StringComparison.OrdinalIgnoreCase)
-            || fileName.Contains("architectural", StringComparison.OrdinalIgnoreCase)
-            || fileName.Contains("design", StringComparison.OrdinalIgnoreCase)
-            || fileName.Contains("adr", StringComparison.OrdinalIgnoreCase)
-            || fileName.Contains("decision", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string NormalizeLineEndings(string content)

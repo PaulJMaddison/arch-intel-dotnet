@@ -38,7 +38,7 @@ public static class PackagesReport
     public static PackagesReportData Create(AnalysisContext context)
     {
         var solution = context.Solution;
-        var idMap = solution.Projects.ToDictionary(project => project.Id, ProjectIdentity.CreateStableId);
+        var idMap = solution.Projects.ToDictionary(project => project.Id, project => ProjectIdentity.CreateStableId(project, context.RepoRootPath));
         var cache = new CsprojCache();
 
         var projects = solution.Projects

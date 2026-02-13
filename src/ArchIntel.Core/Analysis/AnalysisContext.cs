@@ -17,7 +17,8 @@ public sealed class AnalysisContext
         int projectCount,
         int failedProjectCount,
         PipelineTimer? pipelineTimer = null,
-        IReadOnlyList<LoadDiagnostic>? loadDiagnostics = null)
+        IReadOnlyList<LoadDiagnostic>? loadDiagnostics = null,
+        string? cliInvocation = null)
     {
         SolutionPath = Path.GetFullPath(solutionPath);
         RepoRootPath = Path.GetFullPath(repoRootPath);
@@ -33,6 +34,7 @@ public sealed class AnalysisContext
         CacheDir = Paths.GetCacheDirectory(RepoRootPath, config.CacheDir);
         MaxDegreeOfParallelism = config.GetEffectiveMaxDegreeOfParallelism();
         AnalysisVersion = ResolveAnalysisVersion();
+        CliInvocation = cliInvocation;
     }
 
     public string SolutionPath { get; }
@@ -48,6 +50,7 @@ public sealed class AnalysisContext
     public int MaxDegreeOfParallelism { get; }
     public PipelineTimer? PipelineTimer { get; }
     public IReadOnlyList<LoadDiagnostic> LoadDiagnostics { get; }
+    public string? CliInvocation { get; }
 
     private static string ResolveAnalysisVersion()
     {
