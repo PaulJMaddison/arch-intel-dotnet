@@ -117,6 +117,10 @@ ArchIntel works entirely without AI. If you choose to integrate AI guidance, tha
 
 ArchIntel is designed to produce structured, deterministic artifacts that can be used with any AI tool of your choice.
 
+ArchIntel produces a deterministic `.archintel/` folder containing structured JSON + Markdown artifacts that describe a .NET solution’s architecture (projects, dependencies, namespaces, symbols, packages, docs, and violations).
+
+That means you can get high-quality AI assistance **without zipping or uploading the entire codebase** — which is often impossible for large repos or restricted environments.
+
 Common workflows:
 
 Paste scan_summary.json to ask for a high-level architecture overview.
