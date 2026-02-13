@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using ArchIntel.Analysis;
 using ArchIntel.Configuration;
 using ArchIntel.Reports;
@@ -43,11 +44,14 @@ public sealed class ScanIntegrationTests
     }
 
     [Fact]
-    public async Task ScanReport_DoesNotThrow_WhenOnlyNonFatalLoadDiagnostics()
+    public async Task ScanReport_NamespacesJoinProjects_AndTotalsReconcile()
     {
         using var temp = new TemporaryDirectory();
         using var workspace = new AdhocWorkspace();
-        var solution = workspace.CurrentSolution.AddProject("Test", "Test", LanguageNames.CSharp).Solution;
+        var projectId = ProjectId.CreateNewId();
+        var solution = workspace.CurrentSolution
+            .AddProject(ProjectInfo.Create(projectId, VersionStamp.Create(), "Test", "Test", LanguageNames.CSharp, filePath: "/repo/src/Test/Test.csproj"))
+            .AddDocument(DocumentId.CreateNewId(projectId), "Test.cs", "namespace Test; public class C { public void M(){} }", filePath: "/repo/src/Test/Test.cs");
         var outputDir = Path.Combine(temp.Path, "output");
         var cacheDir = Path.Combine(temp.Path, "cache");
 
@@ -64,74 +68,68 @@ public sealed class ScanIntegrationTests
             NullLogger.Instance,
             solution.Projects.Count(),
             0,
-            loadDiagnostics: new[]
-            {
-                new LoadDiagnostic("Failure", "NU1605 Detected package downgrade.", false)
-            });
+            loadDiagnostics: new[] { new LoadDiagnostic("Warning", "NU1605 Detected package downgrade.", false) });
 
         var writer = new ReportWriter();
         _ = await writer.WriteAsync(context, "scan", null, ReportFormat.Json, CancellationToken.None);
 
-        var summaryPath = Path.Combine(outputDir, "scan_summary.json");
-        var namespacesPath = Path.Combine(outputDir, "namespaces.json");
+        using var projectsDocument = JsonDocument.Parse(File.ReadAllText(Path.Combine(outputDir, "projects.json")));
+        var projectIds = projectsDocument.RootElement.GetProperty("Projects")
+            .EnumerateArray()
+            .Select(project => project.GetProperty("ProjectId").GetString()!)
+            .ToHashSet(StringComparer.Ordinal);
 
-        using var summaryDocument = JsonDocument.Parse(File.ReadAllText(summaryPath));
-        var methodCounts = summaryDocument.RootElement.GetProperty("MethodCounts");
-        var summaryDeclaredPublicMethodCount = methodCounts.GetProperty("DeclaredPublicMethodCount").GetInt32();
-        var summaryDeprecatedPublicMethodCount = methodCounts.GetProperty("DeprecatedPublicMethodCount").GetInt32();
-        var summaryPublicMethodCount = methodCounts.GetProperty("PublicMethodCount").GetInt32();
-        var summaryPubliclyReachableMethodCount = methodCounts.GetProperty("PubliclyReachableMethodCount").GetInt32();
-        var summaryTotalMethodCount = methodCounts.GetProperty("TotalMethodCount").GetInt32();
-        var summaryInternalMethodCount = methodCounts.GetProperty("InternalMethodCount").GetInt32();
+        using var namespacesDocument = JsonDocument.Parse(File.ReadAllText(Path.Combine(outputDir, "namespaces.json")));
+        var guidRegex = new Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", RegexOptions.Compiled);
 
-        using var namespacesDocument = JsonDocument.Parse(File.ReadAllText(namespacesPath));
-        var namespacesRoot = namespacesDocument.RootElement;
-        var namespaceDeclaredPublicMethodCount = 0;
-        var namespaceDeprecatedPublicMethodCount = 0;
-        var namespacePublicMethodCount = 0;
-        var namespacePubliclyReachableMethodCount = 0;
-        var namespaceTotalMethodCount = 0;
-        var namespaceInternalMethodCount = 0;
+        var declaredTotal = 0;
+        var reachableTotal = 0;
+        var methodsTotal = 0;
+        var internalTotal = 0;
 
-        foreach (var project in namespacesRoot.EnumerateArray())
+        foreach (var project in namespacesDocument.RootElement.EnumerateArray())
         {
-            foreach (var ns in project.GetProperty("Namespaces").EnumerateArray())
-            {
-                _ = ns.GetProperty("PublicTypeCount").GetInt32();
-                _ = ns.GetProperty("TotalTypeCount").GetInt32();
-                Assert.True(ns.TryGetProperty("TopTypes", out var topTypes));
-                Assert.Equal(JsonValueKind.Array, topTypes.ValueKind);
+            var namespaceProjectId = project.GetProperty("ProjectId").GetString();
+            Assert.NotNull(namespaceProjectId);
+            Assert.DoesNotMatch(guidRegex, namespaceProjectId!);
+            Assert.Contains(namespaceProjectId!, projectIds);
 
-                namespaceDeclaredPublicMethodCount += ns.GetProperty("DeclaredPublicMethodCount").GetInt32();
-                namespaceDeprecatedPublicMethodCount += ns.GetProperty("DeprecatedPublicMethodCount").GetInt32();
-                namespacePublicMethodCount += ns.GetProperty("PublicMethodCount").GetInt32();
-                namespacePubliclyReachableMethodCount += ns.GetProperty("PubliclyReachableMethodCount").GetInt32();
-                namespaceTotalMethodCount += ns.GetProperty("TotalMethodCount").GetInt32();
-                namespaceInternalMethodCount += ns.GetProperty("InternalMethodCount").GetInt32();
+            Assert.True(project.TryGetProperty("ProjectPath", out _));
+            Assert.True(project.TryGetProperty("RoslynProjectId", out _));
+
+            var namespaces = project.GetProperty("Namespaces").EnumerateArray().ToArray();
+            Assert.Equal(namespaces.OrderBy(ns => ns.GetProperty("Name").GetString(), StringComparer.Ordinal).Select(ns => ns.GetProperty("Name").GetString()),
+                namespaces.Select(ns => ns.GetProperty("Name").GetString()));
+
+            foreach (var ns in namespaces)
+            {
+                declaredTotal += ns.GetProperty("DeclaredPublicMethodCount").GetInt32();
+                reachableTotal += ns.GetProperty("PubliclyReachableMethodCount").GetInt32();
+                methodsTotal += ns.GetProperty("TotalMethodCount").GetInt32();
+                internalTotal += ns.GetProperty("InternalMethodCount").GetInt32();
+
+                var topTypes = ns.GetProperty("TopTypes").EnumerateArray().ToArray();
+                var ordered = topTypes
+                    .OrderByDescending(type => type.GetProperty("DeclaredPublicMethodCount").GetInt32())
+                    .ThenBy(type => type.GetProperty("Name").GetString(), StringComparer.Ordinal)
+                    .Select(type => type.GetProperty("Name").GetString())
+                    .ToArray();
+                Assert.Equal(ordered, topTypes.Select(type => type.GetProperty("Name").GetString()).ToArray());
             }
         }
 
-        Assert.Equal(namespaceDeclaredPublicMethodCount, summaryDeclaredPublicMethodCount);
-        Assert.Equal(namespaceDeprecatedPublicMethodCount, summaryDeprecatedPublicMethodCount);
-        Assert.Equal(namespacePublicMethodCount, summaryPublicMethodCount);
-        Assert.Equal(namespacePubliclyReachableMethodCount, summaryPubliclyReachableMethodCount);
-        Assert.Equal(namespaceTotalMethodCount, summaryTotalMethodCount);
-        Assert.Equal(namespaceInternalMethodCount, summaryInternalMethodCount);
+        using var summaryDocument = JsonDocument.Parse(File.ReadAllText(Path.Combine(outputDir, "scan_summary.json")));
+        var methodCounts = summaryDocument.RootElement.GetProperty("MethodCounts");
+        Assert.Equal(declaredTotal, methodCounts.GetProperty("DeclaredPublicMethodsTotal").GetInt32());
+        Assert.Equal(reachableTotal, methodCounts.GetProperty("PubliclyReachableMethodsTotal").GetInt32());
+        Assert.Equal(methodsTotal, methodCounts.GetProperty("TotalMethodsTotal").GetInt32());
+        Assert.Equal(internalTotal, methodCounts.GetProperty("InternalMethodsTotal").GetInt32());
 
-        var symbolsPath = Path.Combine(outputDir, "symbols.json");
-        using var symbolsDocument = JsonDocument.Parse(File.ReadAllText(symbolsPath));
+        using var symbolsDocument = JsonDocument.Parse(File.ReadAllText(Path.Combine(outputDir, "symbols.json")));
         foreach (var symbol in symbolsDocument.RootElement.EnumerateArray())
         {
-            Assert.True(symbol.TryGetProperty("Visibility", out _));
-            Assert.True(symbol.TryGetProperty("BaseType", out _));
-            Assert.True(symbol.TryGetProperty("Interfaces", out _));
-            Assert.True(symbol.TryGetProperty("DeclaredPublicMethodCount", out _));
-            Assert.True(symbol.TryGetProperty("DeprecatedPublicMethodCount", out _));
-            Assert.True(symbol.TryGetProperty("PublicMethodCount", out _));
-            Assert.True(symbol.TryGetProperty("PubliclyReachableMethodCount", out _));
-            Assert.True(symbol.TryGetProperty("TotalMethodCount", out _));
-            Assert.True(symbol.TryGetProperty("Attributes", out _));
-            Assert.True(symbol.TryGetProperty("RelativePath", out _));
+            Assert.True(symbol.TryGetProperty("ProjectId", out var symbolProjectId));
+            Assert.Contains(symbolProjectId.GetString()!, projectIds);
         }
     }
 

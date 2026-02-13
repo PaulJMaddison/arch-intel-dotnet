@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using ArchIntel.Analysis;
 using ArchIntel.Configuration;
 using ArchIntel.IO;
@@ -32,7 +33,14 @@ public sealed class ArtifactConsistencyTests
         var symbols = await index.BuildAsync(solution, "v", CancellationToken.None, "/repo");
 
         var projectIds = projects.Projects.Select(p => p.ProjectId).ToHashSet(StringComparer.Ordinal);
+        var guidRegex = new Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", RegexOptions.Compiled);
+
         Assert.All(symbols.Symbols, symbol => Assert.Contains(symbol.ProjectId, projectIds));
+        Assert.All(symbols.Namespaces, projectNamespace =>
+        {
+            Assert.DoesNotMatch(guidRegex, projectNamespace.ProjectId);
+            Assert.Contains(projectNamespace.ProjectId, projectIds);
+        });
         Assert.All(graph.Nodes, node => Assert.Contains(node.Id, projectIds));
     }
 

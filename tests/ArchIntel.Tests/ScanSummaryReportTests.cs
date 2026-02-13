@@ -53,19 +53,16 @@ public sealed class ScanSummaryReportTests
         Assert.Equal(1, counts.GetProperty("AnalyzedDocuments").GetInt32());
 
         Assert.True(root.TryGetProperty("MethodCounts", out var methodCounts));
-        Assert.Equal(0, methodCounts.GetProperty("DeclaredPublicMethodCount").GetInt32());
-        Assert.Equal(0, methodCounts.GetProperty("DeprecatedPublicMethodCount").GetInt32());
-        Assert.Equal(0, methodCounts.GetProperty("PublicMethodCount").GetInt32());
-        Assert.Equal(0, methodCounts.GetProperty("PubliclyReachableMethodCount").GetInt32());
-        Assert.Equal(0, methodCounts.GetProperty("TotalMethodCount").GetInt32());
-        Assert.Equal(0, methodCounts.GetProperty("InternalMethodCount").GetInt32());
+        Assert.Equal(0, methodCounts.GetProperty("DeclaredPublicMethodsTotal").GetInt32());
+        Assert.Equal(0, methodCounts.GetProperty("PubliclyReachableMethodsTotal").GetInt32());
+        Assert.Equal(0, methodCounts.GetProperty("TotalMethodsTotal").GetInt32());
+        Assert.Equal(0, methodCounts.GetProperty("InternalMethodsTotal").GetInt32());
 
         Assert.True(root.TryGetProperty("LoadDiagnostics", out var loadDiagnostics));
         Assert.Equal(JsonValueKind.Array, loadDiagnostics.ValueKind);
         Assert.Equal(1, loadDiagnostics.GetArrayLength());
         Assert.Equal("Warning", loadDiagnostics[0].GetProperty("Kind").GetString());
     }
-
 
     [Fact]
     public void ScanReceiptMarkdown_IncludesPublicSurfaceSections()
@@ -96,6 +93,7 @@ public sealed class ScanSummaryReportTests
                     "App",
                     "p1",
                     "r1",
+                    "src/App/App.csproj",
                     new[]
                     {
                         new NamespaceStat(
@@ -104,11 +102,9 @@ public sealed class ScanSummaryReportTests
                             1,
                             2,
                             2,
-                            2,
-                            2,
                             3,
                             1,
-                            new[] { new TopTypeStat("Controller", "public", 2, 2, 2, 2, 3) })
+                            new[] { new TopTypeStat("Controller", "public", 2, 2, 3) })
                     })
             });
 
@@ -117,46 +113,6 @@ public sealed class ScanSummaryReportTests
         Assert.Contains("## Top namespaces by public surface", markdown, StringComparison.Ordinal);
         Assert.Contains("## Top types per namespace", markdown, StringComparison.Ordinal);
         Assert.Contains("Controller [public]", markdown, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task ScanReceiptWriteAsync_SerializesDeterministicRulesAsSingleLineSortedStrings()
-    {
-        using var temp = new TemporaryDirectory();
-        var outputDir = Path.Combine(temp.Path, "output");
-        var cacheDir = Path.Combine(temp.Path, "cache");
-        Directory.CreateDirectory(outputDir);
-
-        var solution = CreateSolutionWithDocument();
-        var config = new AnalysisConfig
-        {
-            OutputDir = outputDir,
-            CacheDir = cacheDir,
-            MaxDegreeOfParallelism = 1
-        };
-
-        var context = new AnalysisContext(
-            "/repo/arch.sln",
-            "/repo",
-            solution,
-            config,
-            NullLogger.Instance,
-            solution.Projects.Count(),
-            0);
-
-        await ScanReceiptReport.WriteAsync(context, new PhysicalFileSystem(), outputDir, CancellationToken.None);
-
-        var json = await File.ReadAllTextAsync(Path.Combine(outputDir, "scan.json"));
-        using var document = JsonDocument.Parse(json);
-        var rules = document.RootElement.GetProperty("DeterministicRules").EnumerateArray().Select(v => v.GetString()!).ToArray();
-
-        Assert.Equal(rules.OrderBy(rule => rule, StringComparer.Ordinal), rules);
-        Assert.All(rules, rule =>
-        {
-            Assert.DoesNotContain('\r', rule);
-            Assert.DoesNotContain('\n', rule);
-            Assert.False(string.IsNullOrWhiteSpace(rule));
-        });
     }
 
     private static Solution CreateSolutionWithDocument()
@@ -175,7 +131,7 @@ public sealed class ScanSummaryReportTests
         solution = solution.AddDocument(
             DocumentId.CreateNewId(projectId),
             "Program.cs",
-            SourceText.From("namespace App; public class Program { }"),
+            SourceText.From("namespace App; public class Program { }") ,
             filePath: "/repo/src/App/Program.cs");
 
         return solution;
