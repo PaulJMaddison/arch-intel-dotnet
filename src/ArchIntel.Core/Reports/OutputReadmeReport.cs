@@ -28,12 +28,16 @@ public static class OutputReadmeReport
         builder.AppendLine();
         builder.AppendLine("- `scan.json`: configuration receipt for this run (solution path, version, effective config, projects).");
         builder.AppendLine("- `scan_summary.json`: scan counts, method counts (public/total/internal), cache hits/misses, load diagnostics, and timing.");
-        builder.AppendLine("- `namespaces.json`: per-project namespace statistics (named types plus public/total/internal method counts).");
+        builder.AppendLine("- `namespaces.json`: per-project namespace statistics (named types plus declared-public/publicly-reachable/total/internal method counts).");
         builder.AppendLine("- `symbols.json`: symbol index of public types/methods for impact analysis.");
         builder.AppendLine("- `projects.json`: project metadata and dependency graph summary (test projects detected by name or test packages).");
         builder.AppendLine("- `packages.json`: package and framework references per project (from csproj PackageReference/FrameworkReference items).");
         builder.AppendLine("- `insights.json` / `insights.md`: derived architecture insights (fan-in/out leaders, core/risky projects, cycle severity, namespace surface, package drift hotspots).");
         builder.AppendLine("- `*.json` / `*.md`: report-specific outputs (e.g., `impact.json`, `violations.json`, `project_graph.json`).");
+        builder.AppendLine();
+        builder.AppendLine("- `DeclaredPublicMethodCount` counts methods declared `public` regardless of containing type visibility.");
+        builder.AppendLine("- `PubliclyReachableMethodCount` counts `public` methods on types whose full containing-type chain is `public`.");
+        builder.AppendLine("- `DeprecatedPublicMethodCount` and `PublicMethodCount` are retained compatibility aliases of `DeclaredPublicMethodCount`.");
         builder.AppendLine();
         builder.AppendLine("## Using with AI tools");
         builder.AppendLine();

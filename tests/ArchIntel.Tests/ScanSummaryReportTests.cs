@@ -53,7 +53,10 @@ public sealed class ScanSummaryReportTests
         Assert.Equal(1, counts.GetProperty("AnalyzedDocuments").GetInt32());
 
         Assert.True(root.TryGetProperty("MethodCounts", out var methodCounts));
+        Assert.Equal(0, methodCounts.GetProperty("DeclaredPublicMethodCount").GetInt32());
+        Assert.Equal(0, methodCounts.GetProperty("DeprecatedPublicMethodCount").GetInt32());
         Assert.Equal(0, methodCounts.GetProperty("PublicMethodCount").GetInt32());
+        Assert.Equal(0, methodCounts.GetProperty("PubliclyReachableMethodCount").GetInt32());
         Assert.Equal(0, methodCounts.GetProperty("TotalMethodCount").GetInt32());
         Assert.Equal(0, methodCounts.GetProperty("InternalMethodCount").GetInt32());
 
@@ -100,9 +103,12 @@ public sealed class ScanSummaryReportTests
                             1,
                             1,
                             2,
+                            2,
+                            2,
+                            2,
                             3,
                             1,
-                            new[] { new TopTypeStat("Controller", "public", 2, 3) })
+                            new[] { new TopTypeStat("Controller", "public", 2, 2, 2, 2, 3) })
                     })
             });
 

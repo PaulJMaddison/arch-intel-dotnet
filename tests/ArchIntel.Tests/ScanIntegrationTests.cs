@@ -77,13 +77,19 @@ public sealed class ScanIntegrationTests
 
         using var summaryDocument = JsonDocument.Parse(File.ReadAllText(summaryPath));
         var methodCounts = summaryDocument.RootElement.GetProperty("MethodCounts");
+        var summaryDeclaredPublicMethodCount = methodCounts.GetProperty("DeclaredPublicMethodCount").GetInt32();
+        var summaryDeprecatedPublicMethodCount = methodCounts.GetProperty("DeprecatedPublicMethodCount").GetInt32();
         var summaryPublicMethodCount = methodCounts.GetProperty("PublicMethodCount").GetInt32();
+        var summaryPubliclyReachableMethodCount = methodCounts.GetProperty("PubliclyReachableMethodCount").GetInt32();
         var summaryTotalMethodCount = methodCounts.GetProperty("TotalMethodCount").GetInt32();
         var summaryInternalMethodCount = methodCounts.GetProperty("InternalMethodCount").GetInt32();
 
         using var namespacesDocument = JsonDocument.Parse(File.ReadAllText(namespacesPath));
         var namespacesRoot = namespacesDocument.RootElement;
+        var namespaceDeclaredPublicMethodCount = 0;
+        var namespaceDeprecatedPublicMethodCount = 0;
         var namespacePublicMethodCount = 0;
+        var namespacePubliclyReachableMethodCount = 0;
         var namespaceTotalMethodCount = 0;
         var namespaceInternalMethodCount = 0;
 
@@ -96,13 +102,19 @@ public sealed class ScanIntegrationTests
                 Assert.True(ns.TryGetProperty("TopTypes", out var topTypes));
                 Assert.Equal(JsonValueKind.Array, topTypes.ValueKind);
 
+                namespaceDeclaredPublicMethodCount += ns.GetProperty("DeclaredPublicMethodCount").GetInt32();
+                namespaceDeprecatedPublicMethodCount += ns.GetProperty("DeprecatedPublicMethodCount").GetInt32();
                 namespacePublicMethodCount += ns.GetProperty("PublicMethodCount").GetInt32();
+                namespacePubliclyReachableMethodCount += ns.GetProperty("PubliclyReachableMethodCount").GetInt32();
                 namespaceTotalMethodCount += ns.GetProperty("TotalMethodCount").GetInt32();
                 namespaceInternalMethodCount += ns.GetProperty("InternalMethodCount").GetInt32();
             }
         }
 
+        Assert.Equal(namespaceDeclaredPublicMethodCount, summaryDeclaredPublicMethodCount);
+        Assert.Equal(namespaceDeprecatedPublicMethodCount, summaryDeprecatedPublicMethodCount);
         Assert.Equal(namespacePublicMethodCount, summaryPublicMethodCount);
+        Assert.Equal(namespacePubliclyReachableMethodCount, summaryPubliclyReachableMethodCount);
         Assert.Equal(namespaceTotalMethodCount, summaryTotalMethodCount);
         Assert.Equal(namespaceInternalMethodCount, summaryInternalMethodCount);
 
@@ -113,7 +125,10 @@ public sealed class ScanIntegrationTests
             Assert.True(symbol.TryGetProperty("Visibility", out _));
             Assert.True(symbol.TryGetProperty("BaseType", out _));
             Assert.True(symbol.TryGetProperty("Interfaces", out _));
+            Assert.True(symbol.TryGetProperty("DeclaredPublicMethodCount", out _));
+            Assert.True(symbol.TryGetProperty("DeprecatedPublicMethodCount", out _));
             Assert.True(symbol.TryGetProperty("PublicMethodCount", out _));
+            Assert.True(symbol.TryGetProperty("PubliclyReachableMethodCount", out _));
             Assert.True(symbol.TryGetProperty("TotalMethodCount", out _));
             Assert.True(symbol.TryGetProperty("Attributes", out _));
             Assert.True(symbol.TryGetProperty("RelativePath", out _));
