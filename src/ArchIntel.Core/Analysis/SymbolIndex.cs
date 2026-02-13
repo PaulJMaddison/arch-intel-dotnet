@@ -16,7 +16,10 @@ public sealed record SymbolIndexEntry(
     string Visibility,
     string? BaseType,
     IReadOnlyList<string> Interfaces,
+    int DeclaredPublicMethodCount,
+    int DeprecatedPublicMethodCount,
     int PublicMethodCount,
+    int PubliclyReachableMethodCount,
     int TotalMethodCount,
     IReadOnlyList<string> Attributes,
     string? RelativePath);
@@ -24,14 +27,20 @@ public sealed record SymbolIndexEntry(
 public sealed record TopTypeStat(
     string Name,
     string Visibility,
+    int DeclaredPublicMethodCount,
+    int DeprecatedPublicMethodCount,
     int PublicMethodCount,
+    int PubliclyReachableMethodCount,
     int TotalMethodCount);
 
 public sealed record NamespaceStat(
     string Name,
     int PublicTypeCount,
     int TotalTypeCount,
+    int DeclaredPublicMethodCount,
+    int DeprecatedPublicMethodCount,
     int PublicMethodCount,
+    int PubliclyReachableMethodCount,
     int TotalMethodCount,
     int InternalMethodCount,
     IReadOnlyList<TopTypeStat> TopTypes);
@@ -48,22 +57,38 @@ public sealed record SymbolIndexData(
 {
     public MethodCountTotals GetMethodCountTotals()
     {
+        var declaredPublicMethodCount = 0;
+        var publiclyReachableMethodCount = 0;
         var publicMethodCount = 0;
         var totalMethodCount = 0;
         var internalMethodCount = 0;
 
         foreach (var ns in Namespaces.SelectMany(project => project.Namespaces))
         {
+            declaredPublicMethodCount += ns.DeclaredPublicMethodCount;
             publicMethodCount += ns.PublicMethodCount;
+            publiclyReachableMethodCount += ns.PubliclyReachableMethodCount;
             totalMethodCount += ns.TotalMethodCount;
             internalMethodCount += ns.InternalMethodCount;
         }
 
-        return new MethodCountTotals(publicMethodCount, totalMethodCount, internalMethodCount);
+        return new MethodCountTotals(
+            declaredPublicMethodCount,
+            declaredPublicMethodCount,
+            publicMethodCount,
+            publiclyReachableMethodCount,
+            totalMethodCount,
+            internalMethodCount);
     }
 }
 
-public sealed record MethodCountTotals(int PublicMethodCount, int TotalMethodCount, int InternalMethodCount);
+public sealed record MethodCountTotals(
+    int DeclaredPublicMethodCount,
+    int DeprecatedPublicMethodCount,
+    int PublicMethodCount,
+    int PubliclyReachableMethodCount,
+    int TotalMethodCount,
+    int InternalMethodCount);
 
 public sealed class SymbolIndex
 {
@@ -160,6 +185,9 @@ public sealed class SymbolIndex
 
                 if (syntaxSymbol.Kind is SymbolKind.PublicMethod or SymbolKind.Method && syntaxSymbol.Symbol is IMethodSymbol methodSymbol)
                 {
+                    var isPubliclyReachableMethod = IsPubliclyReachableMethod(methodSymbol);
+                    counter.IncrementPubliclyReachableMethod(isPubliclyReachableMethod);
+
                     var typeName = methodSymbol.ContainingType?.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
                     if (!string.IsNullOrWhiteSpace(typeName))
                     {
@@ -167,7 +195,9 @@ public sealed class SymbolIndex
                         var typeCounter = typeCounters.GetOrAdd(
                             typeCounterKey,
                             _ => new TypeCounter(projectIdMap[project.Id], namespaceName, typeName!, GetVisibility(methodSymbol.ContainingType?.DeclaredAccessibility ?? Accessibility.NotApplicable)));
-                        typeCounter.IncrementMethod(syntaxSymbol.Kind == SymbolKind.PublicMethod);
+                        typeCounter.IncrementMethod(
+                            syntaxSymbol.Kind == SymbolKind.PublicMethod,
+                            isPubliclyReachableMethod);
                     }
                 }
 
@@ -210,7 +240,10 @@ public sealed class SymbolIndex
                         string.IsNullOrWhiteSpace(counter.Namespace) ? "(global)" : counter.Namespace,
                         counter.PublicTypeCount,
                         counter.TotalTypeCount,
+                        counter.DeclaredPublicMethodCount,
+                        counter.DeprecatedPublicMethodCount,
                         counter.PublicMethodCount,
+                        counter.PubliclyReachableMethodCount,
                         counter.TotalMethodCount,
                         counter.InternalMethodCount,
                         typeCounters.Values
@@ -222,7 +255,10 @@ public sealed class SymbolIndex
                             .Select(type => new TopTypeStat(
                                 type.Name,
                                 type.Visibility,
+                                type.DeclaredPublicMethodCount,
+                                type.DeprecatedPublicMethodCount,
                                 type.PublicMethodCount,
+                                type.PubliclyReachableMethodCount,
                                 type.TotalMethodCount))
                             .ToArray()))
                     .ToArray()))
@@ -250,7 +286,7 @@ public sealed class SymbolIndex
             var baseType = GetBaseTypeName(syntaxSymbol.Symbol);
             var interfaces = GetInterfaces(syntaxSymbol.Symbol);
             var attributes = GetFrameworkAttributes(syntaxSymbol.Symbol);
-            var (publicMethodCount, totalMethodCount) = GetMethodCounts(syntaxSymbol.Symbol);
+            var (declaredPublicMethodCount, publiclyReachableMethodCount, totalMethodCount) = GetMethodCounts(syntaxSymbol.Symbol);
             return new SymbolIndexEntry(
                 symbolId,
                 syntaxSymbol.Kind.ToString(),
@@ -263,7 +299,10 @@ public sealed class SymbolIndex
                 visibility,
                 baseType,
                 interfaces,
-                publicMethodCount,
+                declaredPublicMethodCount,
+                declaredPublicMethodCount,
+                declaredPublicMethodCount,
+                publiclyReachableMethodCount,
                 totalMethodCount,
                 attributes,
                 relativePath);
@@ -281,6 +320,9 @@ public sealed class SymbolIndex
             "unknown",
             null,
             Array.Empty<string>(),
+            0,
+            0,
+            0,
             0,
             0,
             Array.Empty<string>(),
@@ -379,13 +421,17 @@ public sealed class SymbolIndex
         public string RoslynProjectId { get; }
         public int PublicTypeCount => _publicTypeCount;
         public int TotalTypeCount => _totalTypeCount;
-        public int PublicMethodCount => _publicMethodCount;
+        public int DeclaredPublicMethodCount => _declaredPublicMethodCount;
+        public int DeprecatedPublicMethodCount => _declaredPublicMethodCount;
+        public int PublicMethodCount => _declaredPublicMethodCount;
+        public int PubliclyReachableMethodCount => _publiclyReachableMethodCount;
         public int TotalMethodCount => _totalMethodCount;
-        public int InternalMethodCount => _totalMethodCount - _publicMethodCount;
+        public int InternalMethodCount => _totalMethodCount - _declaredPublicMethodCount;
 
         private int _publicTypeCount;
         private int _totalTypeCount;
-        private int _publicMethodCount;
+        private int _declaredPublicMethodCount;
+        private int _publiclyReachableMethodCount;
         private int _totalMethodCount;
 
         public void Increment(SymbolKind kind, string visibility)
@@ -400,7 +446,7 @@ public sealed class SymbolIndex
             }
             else if (kind == SymbolKind.PublicMethod)
             {
-                Interlocked.Increment(ref _publicMethodCount);
+                Interlocked.Increment(ref _declaredPublicMethodCount);
                 Interlocked.Increment(ref _totalMethodCount);
             }
             else if (kind == SymbolKind.Method)
@@ -408,11 +454,20 @@ public sealed class SymbolIndex
                 Interlocked.Increment(ref _totalMethodCount);
             }
         }
+
+        public void IncrementPubliclyReachableMethod(bool isPubliclyReachableMethod)
+        {
+            if (isPubliclyReachableMethod)
+            {
+                Interlocked.Increment(ref _publiclyReachableMethodCount);
+            }
+        }
     }
 
     private sealed class TypeCounter
     {
-        private int _publicMethodCount;
+        private int _declaredPublicMethodCount;
+        private int _publiclyReachableMethodCount;
         private int _totalMethodCount;
 
         public TypeCounter(string projectId, string namespaceName, string name, string visibility)
@@ -427,7 +482,10 @@ public sealed class SymbolIndex
         public string Visibility { get; private set; }
         public string ProjectId { get; }
         public string Namespace { get; }
-        public int PublicMethodCount => _publicMethodCount;
+        public int DeclaredPublicMethodCount => _declaredPublicMethodCount;
+        public int DeprecatedPublicMethodCount => _declaredPublicMethodCount;
+        public int PublicMethodCount => _declaredPublicMethodCount;
+        public int PubliclyReachableMethodCount => _publiclyReachableMethodCount;
         public int TotalMethodCount => _totalMethodCount;
 
         public void EnsureVisibility(string visibility)
@@ -435,12 +493,17 @@ public sealed class SymbolIndex
             Visibility = visibility;
         }
 
-        public void IncrementMethod(bool isPublic)
+        public void IncrementMethod(bool isPublic, bool isPubliclyReachable)
         {
             Interlocked.Increment(ref _totalMethodCount);
             if (isPublic)
             {
-                Interlocked.Increment(ref _publicMethodCount);
+                Interlocked.Increment(ref _declaredPublicMethodCount);
+            }
+
+            if (isPubliclyReachable)
+            {
+                Interlocked.Increment(ref _publiclyReachableMethodCount);
             }
         }
     }
@@ -586,14 +649,15 @@ public sealed class SymbolIndex
             .ToArray();
     }
 
-    private static (int PublicMethodCount, int TotalMethodCount) GetMethodCounts(ISymbol symbol)
+    private static (int DeclaredPublicMethodCount, int PubliclyReachableMethodCount, int TotalMethodCount) GetMethodCounts(ISymbol symbol)
     {
         if (symbol is not INamedTypeSymbol namedType)
         {
-            return (0, 0);
+            return (0, 0, 0);
         }
 
-        var publicMethods = 0;
+        var declaredPublicMethods = 0;
+        var publiclyReachableMethods = 0;
         var totalMethods = 0;
         foreach (var member in namedType.GetMembers().OfType<IMethodSymbol>())
         {
@@ -605,11 +669,37 @@ public sealed class SymbolIndex
             totalMethods++;
             if (member.DeclaredAccessibility == Accessibility.Public)
             {
-                publicMethods++;
+                declaredPublicMethods++;
+                if (IsPubliclyReachableMethod(member))
+                {
+                    publiclyReachableMethods++;
+                }
             }
         }
 
-        return (publicMethods, totalMethods);
+        return (declaredPublicMethods, publiclyReachableMethods, totalMethods);
+    }
+
+
+    private static bool IsPubliclyReachableMethod(IMethodSymbol methodSymbol)
+    {
+        if (methodSymbol.DeclaredAccessibility != Accessibility.Public)
+        {
+            return false;
+        }
+
+        var containingType = methodSymbol.ContainingType;
+        while (containingType is not null)
+        {
+            if (containingType.DeclaredAccessibility != Accessibility.Public)
+            {
+                return false;
+            }
+
+            containingType = containingType.ContainingType;
+        }
+
+        return true;
     }
 
     private static string? GetSanitizedRelativePath(string? documentPath, string? repoRootPath)

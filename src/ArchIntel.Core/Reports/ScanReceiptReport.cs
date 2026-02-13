@@ -147,10 +147,10 @@ public static class ScanReceiptReport
     private static void AppendTopNamespacesByPublicSurface(StringBuilder builder, SymbolIndexData symbolData)
     {
         builder.AppendLine(); builder.AppendLine("## Top namespaces by public surface");
-        var flattened = symbolData.Namespaces.SelectMany(project => project.Namespaces.Select(ns => new { project.ProjectName, Namespace = ns.Name, ns.PublicTypeCount, ns.TotalTypeCount, ns.PublicMethodCount, ns.TotalMethodCount }))
-            .OrderByDescending(entry => entry.PublicMethodCount).ThenByDescending(entry => entry.PublicTypeCount).ThenByDescending(entry => entry.TotalMethodCount).ThenBy(entry => entry.ProjectName, StringComparer.Ordinal).ThenBy(entry => entry.Namespace, StringComparer.Ordinal).Take(10).ToArray();
+        var flattened = symbolData.Namespaces.SelectMany(project => project.Namespaces.Select(ns => new { project.ProjectName, Namespace = ns.Name, ns.PublicTypeCount, ns.TotalTypeCount, ns.DeclaredPublicMethodCount, ns.TotalMethodCount }))
+            .OrderByDescending(entry => entry.DeclaredPublicMethodCount).ThenByDescending(entry => entry.PublicTypeCount).ThenByDescending(entry => entry.TotalMethodCount).ThenBy(entry => entry.ProjectName, StringComparer.Ordinal).ThenBy(entry => entry.Namespace, StringComparer.Ordinal).Take(10).ToArray();
         if (flattened.Length == 0) { builder.AppendLine("- (none)"); return; }
-        foreach (var entry in flattened) builder.AppendLine($"- {entry.Namespace} ({entry.ProjectName}) — {entry.PublicTypeCount}/{entry.TotalTypeCount} public types, {entry.PublicMethodCount}/{entry.TotalMethodCount} public methods");
+        foreach (var entry in flattened) builder.AppendLine($"- {entry.Namespace} ({entry.ProjectName}) — {entry.PublicTypeCount}/{entry.TotalTypeCount} public types, {entry.DeclaredPublicMethodCount}/{entry.TotalMethodCount} declared public methods");
     }
 
     private static void AppendTopTypesPerNamespace(StringBuilder builder, SymbolIndexData symbolData)
@@ -162,7 +162,7 @@ public static class ScanReceiptReport
         foreach (var entry in namespaces)
         {
             builder.AppendLine($"- {entry.Namespace} ({entry.ProjectName})");
-            foreach (var type in entry.TopTypes) builder.AppendLine($"  - {type.Name} [{type.Visibility}] — {type.PublicMethodCount}/{type.TotalMethodCount} public methods");
+            foreach (var type in entry.TopTypes) builder.AppendLine($"  - {type.Name} [{type.Visibility}] — {type.DeclaredPublicMethodCount}/{type.TotalMethodCount} declared public methods");
         }
     }
 

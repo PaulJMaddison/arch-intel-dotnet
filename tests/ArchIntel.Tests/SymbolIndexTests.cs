@@ -44,12 +44,18 @@ public sealed class SymbolIndexTests
         Assert.Equal(1, alphaNamespace.PublicTypeCount);
         Assert.Equal(1, alphaNamespace.TotalTypeCount);
         Assert.NotEmpty(alphaNamespace.TopTypes);
+        Assert.Equal(1, alphaNamespace.DeclaredPublicMethodCount);
+        Assert.Equal(1, alphaNamespace.DeprecatedPublicMethodCount);
         Assert.Equal(1, alphaNamespace.PublicMethodCount);
+        Assert.Equal(1, alphaNamespace.PubliclyReachableMethodCount);
         Assert.Equal(2, alphaNamespace.TotalMethodCount);
         Assert.Equal(1, alphaNamespace.InternalMethodCount);
 
         var methodTotals = data.GetMethodCountTotals();
+        Assert.Equal(2, methodTotals.DeclaredPublicMethodCount);
+        Assert.Equal(2, methodTotals.DeprecatedPublicMethodCount);
         Assert.Equal(2, methodTotals.PublicMethodCount);
+        Assert.Equal(2, methodTotals.PubliclyReachableMethodCount);
         Assert.Equal(3, methodTotals.TotalMethodCount);
         Assert.Equal(1, methodTotals.InternalMethodCount);
     }
@@ -200,11 +206,47 @@ public sealed class SymbolIndexTests
 
         var namespaces = data.Namespaces.Single(stats => stats.ProjectName == "Delta").Namespaces;
         var apiNamespace = namespaces.Single(stat => stat.Name == "Delta.Api");
+        Assert.Equal(3, apiNamespace.DeclaredPublicMethodCount);
         Assert.Equal(3, apiNamespace.PublicMethodCount);
+        Assert.Equal(3, apiNamespace.PubliclyReachableMethodCount);
         Assert.Equal(6, apiNamespace.TotalMethodCount);
         Assert.Equal(3, apiNamespace.InternalMethodCount);
     }
 
+
+
+    [Fact]
+    public async Task BuildAsync_DistinguishesDeclaredAndPubliclyReachableMethodCounts()
+    {
+        var workspace = new AdhocWorkspace();
+        var solution = workspace.CurrentSolution;
+
+        var projectId = ProjectId.CreateNewId();
+        solution = solution.AddProject(ProjectInfo.Create(projectId, VersionStamp.Create(), "Sigma", "Sigma", LanguageNames.CSharp, filePath: "/repo/src/Sigma/Sigma.csproj"));
+
+        solution = solution.AddDocument(
+            DocumentId.CreateNewId(projectId),
+            "Types.cs",
+            @"namespace Sigma;
+              internal class Foo { public void Bar() { } }
+              public class Baz { public void Qux() { } }",
+            filePath: "/repo/src/Sigma/Types.cs");
+
+        var index = CreateIndex();
+        var data = await index.BuildAsync(solution, "test-version", CancellationToken.None);
+
+        var ns = data.Namespaces.Single(stats => stats.ProjectName == "Sigma").Namespaces.Single(stat => stat.Name == "Sigma");
+        Assert.Equal(2, ns.DeclaredPublicMethodCount);
+        Assert.Equal(1, ns.PubliclyReachableMethodCount);
+
+        var foo = ns.TopTypes.Single(type => type.Name == "Foo");
+        Assert.Equal(1, foo.DeclaredPublicMethodCount);
+        Assert.Equal(0, foo.PubliclyReachableMethodCount);
+
+        var baz = ns.TopTypes.Single(type => type.Name == "Baz");
+        Assert.Equal(1, baz.DeclaredPublicMethodCount);
+        Assert.Equal(1, baz.PubliclyReachableMethodCount);
+    }
 
     [Fact]
     public async Task BuildAsync_EnrichesSymbolMetadataAndRelativePaths_Deterministically()
@@ -244,7 +286,8 @@ public sealed class SymbolIndexTests
         Assert.Equal("public", type.Visibility);
         Assert.Equal("BaseController", type.BaseType);
         Assert.Contains("IRunner", type.Interfaces);
-        Assert.Equal(1, type.PublicMethodCount);
+        Assert.Equal(1, type.DeclaredPublicMethodCount);
+        Assert.Equal(1, type.PubliclyReachableMethodCount);
         Assert.Equal(2, type.TotalMethodCount);
         Assert.Contains("Authorize", type.Attributes);
         Assert.Equal("src/Api/Controller.cs", type.RelativePath);

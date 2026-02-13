@@ -192,10 +192,10 @@ public sealed class ArchitecturePassportGenerator
                 Namespace = ns.Name,
                 ns.PublicTypeCount,
                 ns.TotalTypeCount,
-                ns.PublicMethodCount,
+                ns.DeclaredPublicMethodCount,
                 ns.TotalMethodCount
             }))
-            .OrderByDescending(entry => entry.PublicMethodCount)
+            .OrderByDescending(entry => entry.DeclaredPublicMethodCount)
             .ThenByDescending(entry => entry.PublicTypeCount)
             .ThenByDescending(entry => entry.TotalMethodCount)
             .ThenBy(entry => entry.ProjectName, StringComparer.Ordinal)
@@ -212,7 +212,7 @@ public sealed class ArchitecturePassportGenerator
 
         foreach (var entry in flattened)
         {
-            builder.AppendLine($"- {entry.Namespace} ({entry.ProjectName}) — {entry.PublicTypeCount}/{entry.TotalTypeCount} public types, {entry.PublicMethodCount}/{entry.TotalMethodCount} public methods");
+            builder.AppendLine($"- {entry.Namespace} ({entry.ProjectName}) — {entry.PublicTypeCount}/{entry.TotalTypeCount} public types, {entry.DeclaredPublicMethodCount}/{entry.TotalMethodCount} declared public methods");
         }
 
         builder.AppendLine();
@@ -241,7 +241,7 @@ public sealed class ArchitecturePassportGenerator
             builder.AppendLine($"- {entry.Namespace} ({entry.ProjectName})");
             foreach (var type in entry.TopTypes)
             {
-                builder.AppendLine($"  - {type.Name} [{type.Visibility}] — {type.PublicMethodCount}/{type.TotalMethodCount} public methods");
+                builder.AppendLine($"  - {type.Name} [{type.Visibility}] — {type.DeclaredPublicMethodCount}/{type.TotalMethodCount} declared public methods");
             }
         }
 
