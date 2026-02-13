@@ -249,8 +249,8 @@ public sealed class ReportWriter : IReportWriter
     {
         public static ReportData Create(AnalysisContext context, string kind, string? symbol)
         {
-            var include = context.Config.IncludeGlobs.OrderBy(value => value, StringComparer.Ordinal).ToArray();
-            var exclude = context.Config.ExcludeGlobs.OrderBy(value => value, StringComparer.Ordinal).ToArray();
+            var include = context.Config.GetEffectiveIncludeGlobs().OrderBy(value => value, StringComparer.Ordinal).ToArray();
+            var exclude = context.Config.GetEffectiveExcludeGlobs().OrderBy(value => value, StringComparer.Ordinal).ToArray();
 
             return new ReportData(
                 kind,

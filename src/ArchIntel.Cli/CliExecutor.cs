@@ -9,6 +9,42 @@ namespace ArchIntel;
 
 internal static class CliExecutor
 {
+    public static Task<int> RunReportAsync(
+        ILogger logger,
+        ISolutionLoader solutionLoader,
+        IReportWriter reportWriter,
+        string solution,
+        string? output,
+        string? configPath,
+        string? format,
+        bool? failOnLoadIssues,
+        bool strict,
+        bool includeDocSnippets,
+        bool verbose,
+        string reportKind,
+        string? symbol,
+        bool openOutput,
+        CancellationToken cancellationToken)
+    {
+        return RunReportAsync(
+            logger,
+            solutionLoader,
+            reportWriter,
+            solution,
+            output,
+            configPath,
+            format,
+            failOnLoadIssues,
+            strict,
+            includeDocSnippets,
+            verbose,
+            reportKind,
+            symbol,
+            openOutput,
+            null,
+            cancellationToken);
+    }
+
     public static async Task<int> RunReportAsync(
         ILogger logger,
         ISolutionLoader solutionLoader,
@@ -24,6 +60,7 @@ internal static class CliExecutor
         string reportKind,
         string? symbol,
         bool openOutput,
+        string? cliInvocation,
         CancellationToken cancellationToken)
     {
         var config = AnalysisConfig.Load(configPath);
@@ -55,7 +92,8 @@ internal static class CliExecutor
                 loadResult.ProjectCount,
                 loadResult.FailedProjectCount,
                 pipelineTimer: pipelineTimer,
-                loadDiagnostics: loadResult.LoadDiagnostics);
+                loadDiagnostics: loadResult.LoadDiagnostics,
+                cliInvocation: cliInvocation);
 
             SafeLog.Info(logger, "Generating {ReportKind} report for {Solution}.", reportKind, SafeLog.SanitizePath(solution));
 
@@ -197,49 +235,18 @@ internal static class CliExecutor
             }
             : strictConfig;
 
-        if (string.IsNullOrWhiteSpace(output))
-        {
-            if (failOnLoadIssues is null)
-            {
-                return new AnalysisConfig
-                {
-                    IncludeGlobs = config.IncludeGlobs,
-                    ExcludeGlobs = config.ExcludeGlobs,
-                    OutputDir = config.OutputDir,
-                    CacheDir = config.CacheDir,
-                    MaxDegreeOfParallelism = config.MaxDegreeOfParallelism,
-                    FailOnLoadIssues = config.FailOnLoadIssues,
-                    IncludeDocSnippets = includeSnippets,
-                    Strict = mergedStrict,
-                    ArchitectureRules = config.ArchitectureRules
-                };
-            }
-
-            return new AnalysisConfig
-            {
-                IncludeGlobs = config.IncludeGlobs,
-                ExcludeGlobs = config.ExcludeGlobs,
-                OutputDir = config.OutputDir,
-                CacheDir = config.CacheDir,
-                MaxDegreeOfParallelism = config.MaxDegreeOfParallelism,
-                FailOnLoadIssues = failOnLoadIssues.Value,
-                IncludeDocSnippets = includeSnippets,
-                Strict = mergedStrict,
-                ArchitectureRules = config.ArchitectureRules
-            };
-        }
-
         return new AnalysisConfig
         {
             IncludeGlobs = config.IncludeGlobs,
             ExcludeGlobs = config.ExcludeGlobs,
-            OutputDir = output,
+            OutputDir = string.IsNullOrWhiteSpace(output) ? config.OutputDir : output,
             CacheDir = config.CacheDir,
             MaxDegreeOfParallelism = config.MaxDegreeOfParallelism,
             FailOnLoadIssues = failOnLoadIssues ?? config.FailOnLoadIssues,
             IncludeDocSnippets = includeSnippets,
             Strict = mergedStrict,
-            ArchitectureRules = config.ArchitectureRules
+            ArchitectureRules = config.ArchitectureRules,
+            Layers = config.Layers
         };
     }
 

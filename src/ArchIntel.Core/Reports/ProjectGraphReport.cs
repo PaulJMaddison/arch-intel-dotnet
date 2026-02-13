@@ -13,7 +13,7 @@ public sealed record ProjectGraphReportData(
 {
     public static ProjectGraphReportData Create(AnalysisContext context)
     {
-        var graph = ProjectGraphBuilder.Build(context.Solution, context.RepoRootPath);
+        var graph = ProjectGraphBuilder.Build(context.Solution, context.RepoRootPath, context.Config);
         return new ProjectGraphReportData(
             "project_graph",
             context.SolutionPath,

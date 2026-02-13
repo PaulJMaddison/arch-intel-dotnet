@@ -4,6 +4,9 @@ namespace ArchIntel.Configuration;
 
 public sealed class AnalysisConfig
 {
+    public static readonly IReadOnlyList<string> DefaultIncludeGlobs = ["**/*.cs", "**/*.csproj", "**/*.sln", "**/*.props", "**/*.targets"];
+    public static readonly IReadOnlyList<string> DefaultExcludeGlobs = ["**/bin/**", "**/obj/**", "**/.git/**", "**/.archintel/**"];
+
     public IReadOnlyList<string> IncludeGlobs { get; init; } = Array.Empty<string>();
     public IReadOnlyList<string> ExcludeGlobs { get; init; } = Array.Empty<string>();
     public string? OutputDir { get; init; }
@@ -13,6 +16,17 @@ public sealed class AnalysisConfig
     public bool IncludeDocSnippets { get; init; }
     public StrictModeConfig Strict { get; init; } = new();
     public ArchitectureRulesConfig ArchitectureRules { get; init; } = new();
+    public LayerClassificationConfig Layers { get; init; } = new();
+
+    public IReadOnlyList<string> GetEffectiveIncludeGlobs()
+    {
+        return IncludeGlobs.Count == 0 ? DefaultIncludeGlobs : IncludeGlobs;
+    }
+
+    public IReadOnlyList<string> GetEffectiveExcludeGlobs()
+    {
+        return ExcludeGlobs.Count == 0 ? DefaultExcludeGlobs : ExcludeGlobs;
+    }
 
     public int GetEffectiveMaxDegreeOfParallelism()
     {

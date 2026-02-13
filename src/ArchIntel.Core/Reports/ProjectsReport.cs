@@ -10,11 +10,16 @@ public sealed record ProjectsReportProjectReference(string ProjectId, string Pro
 
 public sealed record ProjectsReportProject(
     string ProjectId,
+    string RoslynProjectId,
     string ProjectName,
     string? AssemblyName,
     IReadOnlyList<string> TargetFrameworks,
     string? OutputType,
     bool IsTestProject,
+    string TestDetectionReason,
+    string Layer,
+    string LayerReason,
+    string? LayerRuleMatched,
     IReadOnlyList<ProjectsReportProjectReference> ProjectReferences);
 
 public sealed record ProjectsReportGraphSummary(
@@ -32,49 +37,26 @@ public sealed record ProjectsReportData(
 
 public static class ProjectsReport
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        WriteIndented = true
-    };
-
-    private static readonly string[] TestPackageMarkers =
-    [
-        "xunit",
-        "nunit",
-        "mstest"
-    ];
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public static ProjectsReportData Create(AnalysisContext context)
     {
         var solution = context.Solution;
-        var graph = ProjectGraphBuilder.Build(solution, context.RepoRootPath);
-        var idMap = solution.Projects.ToDictionary(project => project.Id, ProjectIdentity.CreateStableId);
+        var graph = ProjectGraphBuilder.Build(solution, context.RepoRootPath, context.Config);
+        var factsByProject = solution.Projects.ToDictionary(project => project.Id, p => ProjectFacts.Get(p, context.RepoRootPath, context.Config));
 
         var projects = solution.Projects
-            .Select(project => CreateProject(project, solution, idMap))
+            .Select(project => CreateProject(project, solution, factsByProject))
             .OrderBy(project => project.ProjectName, StringComparer.Ordinal)
             .ThenBy(project => project.ProjectId, StringComparer.Ordinal)
             .ToArray();
 
-        var summary = new ProjectsReportGraphSummary(
-            graph.Nodes.Count,
-            graph.Edges.Count,
-            graph.Cycles.Count > 0,
-            graph.Cycles);
+        var summary = new ProjectsReportGraphSummary(graph.Nodes.Count, graph.Edges.Count, graph.Cycles.Count > 0, graph.Cycles);
 
-        return new ProjectsReportData(
-            "projects",
-            context.SolutionPath,
-            context.AnalysisVersion,
-            projects,
-            summary);
+        return new ProjectsReportData("projects", context.SolutionPath, context.AnalysisVersion, projects, summary);
     }
 
-    public static async Task WriteAsync(
-        AnalysisContext context,
-        IFileSystem fileSystem,
-        string outputDirectory,
-        CancellationToken cancellationToken)
+    public static async Task WriteAsync(AnalysisContext context, IFileSystem fileSystem, string outputDirectory, CancellationToken cancellationToken)
     {
         var data = Create(context);
         var path = Path.Combine(outputDirectory, "projects.json");
@@ -85,33 +67,35 @@ public static class ProjectsReport
     private static ProjectsReportProject CreateProject(
         Project project,
         Solution solution,
-        IReadOnlyDictionary<ProjectId, string> idMap)
+        IReadOnlyDictionary<ProjectId, ProjectFactsResult> factsByProject)
     {
-        var projectId = idMap[project.Id];
+        var facts = factsByProject[project.Id];
         var references = project.ProjectReferences
             .Select(reference => solution.GetProject(reference.ProjectId))
             .Where(referenceProject => referenceProject is not null)
-            .Select(referenceProject => new ProjectsReportProjectReference(
-                idMap[referenceProject!.Id],
-                referenceProject.Name))
+            .Select(referenceProject =>
+            {
+                var referenceFacts = factsByProject[referenceProject!.Id];
+                return new ProjectsReportProjectReference(referenceFacts.ProjectId, referenceProject.Name);
+            })
             .OrderBy(reference => reference.ProjectName, StringComparer.Ordinal)
             .ThenBy(reference => reference.ProjectId, StringComparer.Ordinal)
             .ToArray();
 
-        var assemblyName = string.IsNullOrWhiteSpace(project.AssemblyName)
-            ? null
-            : project.AssemblyName;
-
-        var targetFrameworks = GetTargetFrameworks(project.FilePath);
-        var outputType = GetOutputType(project);
+        var assemblyName = string.IsNullOrWhiteSpace(project.AssemblyName) ? null : project.AssemblyName;
 
         return new ProjectsReportProject(
-            projectId,
+            facts.ProjectId,
+            facts.RoslynProjectId,
             project.Name,
             assemblyName,
-            targetFrameworks,
-            outputType,
-            IsTestProject(project),
+            GetTargetFrameworks(project.FilePath),
+            GetOutputType(project),
+            facts.IsTestProject,
+            facts.TestDetectionReason.ToString(),
+            facts.Layer,
+            facts.LayerReason.ToString(),
+            facts.LayerRuleMatched,
             references);
     }
 
@@ -125,15 +109,13 @@ public static class ProjectsReport
         try
         {
             var document = XDocument.Load(filePath);
-            var frameworks = GetFrameworkValue(document, "TargetFrameworks")
-                             ?? GetFrameworkValue(document, "TargetFramework");
+            var frameworks = GetFrameworkValue(document, "TargetFrameworks") ?? GetFrameworkValue(document, "TargetFramework");
             if (string.IsNullOrWhiteSpace(frameworks))
             {
                 return Array.Empty<string>();
             }
 
-            return frameworks
-                .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            return frameworks.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .OrderBy(value => value, StringComparer.Ordinal)
                 .ToArray();
         }
@@ -163,50 +145,5 @@ public static class ProjectsReport
             OutputKind.WindowsRuntimeMetadata => "Library",
             _ => null
         };
-    }
-
-    private static bool IsTestProject(Project project)
-    {
-        if (project.Name.Contains("test", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        return HasTestPackageReference(project);
-    }
-
-    private static bool HasTestPackageReference(Project project)
-    {
-        foreach (var candidate in GetReferenceNames(project))
-        {
-            foreach (var marker in TestPackageMarkers)
-            {
-                if (candidate.Contains(marker, StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    private static IEnumerable<string> GetReferenceNames(Project project)
-    {
-        foreach (var reference in project.MetadataReferences)
-        {
-            if (!string.IsNullOrWhiteSpace(reference.Display))
-            {
-                yield return reference.Display!;
-            }
-        }
-
-        foreach (var analyzer in project.AnalyzerReferences)
-        {
-            if (!string.IsNullOrWhiteSpace(analyzer.FullPath))
-            {
-                yield return analyzer.FullPath;
-            }
-        }
     }
 }

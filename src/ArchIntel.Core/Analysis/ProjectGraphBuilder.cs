@@ -1,28 +1,38 @@
 using System.Collections.ObjectModel;
+using ArchIntel.Configuration;
 using Microsoft.CodeAnalysis;
 
 namespace ArchIntel.Analysis;
 
 public static class ProjectGraphBuilder
 {
-    public static ProjectGraph Build(Solution solution, string repoRootPath)
+    public static ProjectGraph Build(Solution solution, string repoRootPath, AnalysisConfig? config = null)
     {
+        config ??= new AnalysisConfig();
         var projects = solution.Projects.ToArray();
         var idMap = new Dictionary<ProjectId, string>();
-        var nodes = new List<ProjectNode>(projects.Length);
+        var nodeMap = new Dictionary<ProjectId, ProjectNode>();
 
         foreach (var project in projects)
         {
-            var id = ProjectIdentity.CreateStableId(project);
-            idMap[project.Id] = id;
-
+            var facts = ProjectFacts.Get(project, repoRootPath, config);
             var path = GetDisplayPath(project.FilePath, repoRootPath);
-            var layer = ProjectLayerClassifier.Classify(project.Name, path);
+            var node = new ProjectNode(
+                facts.ProjectId,
+                project.Name,
+                path,
+                facts.Layer,
+                facts.LayerReason.ToString(),
+                facts.LayerRuleMatched,
+                facts.RoslynProjectId,
+                facts.IsTestProject,
+                facts.TestDetectionReason.ToString());
 
-            nodes.Add(new ProjectNode(id, project.Name, path, layer));
+            idMap[project.Id] = facts.ProjectId;
+            nodeMap[project.Id] = node;
         }
 
-        nodes = nodes
+        var nodes = nodeMap.Values
             .OrderBy(node => node.Path, StringComparer.Ordinal)
             .ThenBy(node => node.Name, StringComparer.Ordinal)
             .ThenBy(node => node.Id, StringComparer.Ordinal)
@@ -71,11 +81,11 @@ public static class ProjectGraphBuilder
             var root = Path.GetFullPath(repoRootPath);
             if (fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
             {
-                return Path.GetRelativePath(root, fullPath);
+                return Path.GetRelativePath(root, fullPath).Replace('\\', '/');
             }
         }
 
-        return fullPath;
+        return fullPath.Replace('\\', '/');
     }
 
     private static Dictionary<string, List<string>> BuildAdjacency(
@@ -171,11 +181,9 @@ public static class ProjectGraphBuilder
             cycles.Add(component.AsReadOnly());
         }
 
-        var ordered = cycles
+        return cycles
             .OrderBy(cycle => cycle[0], StringComparer.Ordinal)
             .ThenBy(cycle => cycle.Count)
-            .ToList();
-
-        return new ReadOnlyCollection<IReadOnlyList<string>>(ordered);
+            .ToArray();
     }
 }

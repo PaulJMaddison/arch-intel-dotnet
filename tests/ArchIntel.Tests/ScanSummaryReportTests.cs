@@ -71,6 +71,9 @@ public sealed class ScanSummaryReportTests
             "scan",
             "/repo/arch.sln",
             "v1",
+            "v1",
+            null,
+            "arch scan --solution /repo/arch.sln",
             "/repo/out",
             "/repo/cache",
             1,
@@ -79,7 +82,7 @@ public sealed class ScanSummaryReportTests
             null,
             Array.Empty<string>(),
             Array.Empty<string>(),
-            new[] { new ScanReceiptProject("App", "src/App/App.csproj") },
+            new[] { new ScanReceiptProject("p1", "r1", "App", "src/App/App.csproj") },
             InsightsReport.DeterministicRules);
 
         var symbolData = new SymbolIndexData(
@@ -89,6 +92,7 @@ public sealed class ScanSummaryReportTests
                 new ProjectNamespaceStats(
                     "App",
                     "p1",
+                    "r1",
                     new[]
                     {
                         new NamespaceStat(

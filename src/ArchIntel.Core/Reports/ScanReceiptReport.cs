@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using ArchIntel.Analysis;
@@ -5,12 +6,15 @@ using ArchIntel.IO;
 
 namespace ArchIntel.Reports;
 
-public sealed record ScanReceiptProject(string Name, string Path);
+public sealed record ScanReceiptProject(string ProjectId, string RoslynProjectId, string Name, string Path);
 
 public sealed record ScanReceiptReportData(
     string Kind,
     string SolutionPath,
     string AnalysisVersion,
+    string ToolVersion,
+    string? CommitHash,
+    string? CliInvocation,
     string OutputDir,
     string CacheDir,
     int MaxDegreeOfParallelism,
@@ -24,25 +28,30 @@ public sealed record ScanReceiptReportData(
 
 public static class ScanReceiptReport
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        WriteIndented = true
-    };
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public static ScanReceiptReportData Create(AnalysisContext context)
     {
-        var include = context.Config.IncludeGlobs.OrderBy(value => value, StringComparer.Ordinal).ToArray();
-        var exclude = context.Config.ExcludeGlobs.OrderBy(value => value, StringComparer.Ordinal).ToArray();
+        var include = context.Config.GetEffectiveIncludeGlobs().OrderBy(value => value, StringComparer.Ordinal).ToArray();
+        var exclude = context.Config.GetEffectiveExcludeGlobs().OrderBy(value => value, StringComparer.Ordinal).ToArray();
         var projects = context.Solution.Projects
-            .Select(project => new ScanReceiptProject(project.Name, GetDisplayPath(project.FilePath, context.RepoRootPath)))
+            .Select(project =>
+            {
+                var facts = ProjectFacts.Get(project, context.RepoRootPath, context.Config);
+                return new ScanReceiptProject(facts.ProjectId, facts.RoslynProjectId, project.Name, GetDisplayPath(project.FilePath, context.RepoRootPath));
+            })
             .OrderBy(project => project.Path, StringComparer.Ordinal)
             .ThenBy(project => project.Name, StringComparer.Ordinal)
+            .ThenBy(project => project.ProjectId, StringComparer.Ordinal)
             .ToArray();
 
         return new ScanReceiptReportData(
             "scan",
             context.SolutionPath,
             context.AnalysisVersion,
+            context.AnalysisVersion,
+            TryGetCommitHash(context.RepoRootPath),
+            context.CliInvocation,
             context.OutputDir,
             context.CacheDir,
             context.MaxDegreeOfParallelism,
@@ -62,6 +71,9 @@ public static class ScanReceiptReport
         builder.AppendLine();
         builder.AppendLine($"- Solution: {data.SolutionPath}");
         builder.AppendLine($"- Analysis version: {data.AnalysisVersion}");
+        builder.AppendLine($"- Tool version: {data.ToolVersion}");
+        builder.AppendLine($"- Commit hash: {data.CommitHash ?? "(unknown)"}");
+        builder.AppendLine($"- CLI invocation: {data.CliInvocation ?? "(unknown)"}");
         builder.AppendLine($"- Output directory: {data.OutputDir}");
         builder.AppendLine($"- Cache directory: {data.CacheDir}");
         builder.AppendLine($"- MaxDegreeOfParallelism: {data.MaxDegreeOfParallelism}");
@@ -73,21 +85,13 @@ public static class ScanReceiptReport
         builder.AppendLine($"- Deterministic insight rules: {FormatList(data.DeterministicRules)}");
         builder.AppendLine();
         builder.AppendLine("## Projects");
-        if (data.Projects.Count == 0)
-        {
-            builder.AppendLine();
-            builder.AppendLine("*(none)*");
-            return builder.ToString();
-        }
-
         builder.AppendLine();
-        builder.AppendLine("| Name | Path |");
-        builder.AppendLine("| --- | --- |");
+        builder.AppendLine("| ProjectId | Name | Path |");
+        builder.AppendLine("| --- | --- | --- |");
         foreach (var project in data.Projects)
         {
-            builder.AppendLine($"| {project.Name} | {project.Path} |");
+            builder.AppendLine($"| {project.ProjectId} | {project.Name} | {project.Path} |");
         }
-
 
         if (symbolData is not null)
         {
@@ -98,11 +102,7 @@ public static class ScanReceiptReport
         return builder.ToString();
     }
 
-    public static async Task WriteAsync(
-        AnalysisContext context,
-        IFileSystem fileSystem,
-        string outputDirectory,
-        CancellationToken cancellationToken)
+    public static async Task WriteAsync(AnalysisContext context, IFileSystem fileSystem, string outputDirectory, CancellationToken cancellationToken)
     {
         var data = Create(context);
         var path = Path.Combine(outputDirectory, "scan.json");
@@ -110,99 +110,72 @@ public static class ScanReceiptReport
         await fileSystem.WriteAllTextAsync(path, json, cancellationToken);
     }
 
+    private static string? TryGetCommitHash(string repoRootPath)
+    {
+        try
+        {
+            var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = "git",
+                Arguments = "rev-parse HEAD",
+                WorkingDirectory = repoRootPath,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false
+            });
+
+            if (process is null)
+            {
+                return null;
+            }
+
+            process.WaitForExit(2000);
+            if (process.ExitCode != 0)
+            {
+                return null;
+            }
+
+            var value = process.StandardOutput.ReadToEnd().Trim();
+            return string.IsNullOrWhiteSpace(value) ? null : value;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 
     private static void AppendTopNamespacesByPublicSurface(StringBuilder builder, SymbolIndexData symbolData)
     {
-        builder.AppendLine();
-        builder.AppendLine("## Top namespaces by public surface");
-
-        var flattened = symbolData.Namespaces
-            .SelectMany(project => project.Namespaces.Select(ns => new
-            {
-                project.ProjectName,
-                Namespace = ns.Name,
-                ns.PublicTypeCount,
-                ns.TotalTypeCount,
-                ns.PublicMethodCount,
-                ns.TotalMethodCount
-            }))
-            .OrderByDescending(entry => entry.PublicMethodCount)
-            .ThenByDescending(entry => entry.PublicTypeCount)
-            .ThenByDescending(entry => entry.TotalMethodCount)
-            .ThenBy(entry => entry.ProjectName, StringComparer.Ordinal)
-            .ThenBy(entry => entry.Namespace, StringComparer.Ordinal)
-            .Take(10)
-            .ToArray();
-
-        if (flattened.Length == 0)
-        {
-            builder.AppendLine("- (none)");
-            return;
-        }
-
-        foreach (var entry in flattened)
-        {
-            builder.AppendLine($"- {entry.Namespace} ({entry.ProjectName}) — {entry.PublicTypeCount}/{entry.TotalTypeCount} public types, {entry.PublicMethodCount}/{entry.TotalMethodCount} public methods");
-        }
+        builder.AppendLine(); builder.AppendLine("## Top namespaces by public surface");
+        var flattened = symbolData.Namespaces.SelectMany(project => project.Namespaces.Select(ns => new { project.ProjectName, Namespace = ns.Name, ns.PublicTypeCount, ns.TotalTypeCount, ns.PublicMethodCount, ns.TotalMethodCount }))
+            .OrderByDescending(entry => entry.PublicMethodCount).ThenByDescending(entry => entry.PublicTypeCount).ThenByDescending(entry => entry.TotalMethodCount).ThenBy(entry => entry.ProjectName, StringComparer.Ordinal).ThenBy(entry => entry.Namespace, StringComparer.Ordinal).Take(10).ToArray();
+        if (flattened.Length == 0) { builder.AppendLine("- (none)"); return; }
+        foreach (var entry in flattened) builder.AppendLine($"- {entry.Namespace} ({entry.ProjectName}) — {entry.PublicTypeCount}/{entry.TotalTypeCount} public types, {entry.PublicMethodCount}/{entry.TotalMethodCount} public methods");
     }
 
     private static void AppendTopTypesPerNamespace(StringBuilder builder, SymbolIndexData symbolData)
     {
-        builder.AppendLine();
-        builder.AppendLine("## Top types per namespace");
-
-        var namespaces = symbolData.Namespaces
-            .SelectMany(project => project.Namespaces.Select(ns => new { project.ProjectName, Namespace = ns.Name, ns.TopTypes }))
-            .Where(entry => entry.TopTypes.Count > 0)
-            .OrderBy(entry => entry.ProjectName, StringComparer.Ordinal)
-            .ThenBy(entry => entry.Namespace, StringComparer.Ordinal)
-            .ToArray();
-
-        if (namespaces.Length == 0)
-        {
-            builder.AppendLine("- (none)");
-            return;
-        }
-
+        builder.AppendLine(); builder.AppendLine("## Top types per namespace");
+        var namespaces = symbolData.Namespaces.SelectMany(project => project.Namespaces.Select(ns => new { project.ProjectName, Namespace = ns.Name, ns.TopTypes }))
+            .Where(entry => entry.TopTypes.Count > 0).OrderBy(entry => entry.ProjectName, StringComparer.Ordinal).ThenBy(entry => entry.Namespace, StringComparer.Ordinal).ToArray();
+        if (namespaces.Length == 0) { builder.AppendLine("- (none)"); return; }
         foreach (var entry in namespaces)
         {
             builder.AppendLine($"- {entry.Namespace} ({entry.ProjectName})");
-            foreach (var type in entry.TopTypes)
-            {
-                builder.AppendLine($"  - {type.Name} [{type.Visibility}] — {type.PublicMethodCount}/{type.TotalMethodCount} public methods");
-            }
+            foreach (var type in entry.TopTypes) builder.AppendLine($"  - {type.Name} [{type.Visibility}] — {type.PublicMethodCount}/{type.TotalMethodCount} public methods");
         }
     }
 
-    private static string FormatList(IReadOnlyList<string> values)
-    {
-        if (values.Count == 0)
-        {
-            return "(none)";
-        }
-
-        return string.Join(", ", values);
-    }
+    private static string FormatList(IReadOnlyList<string> values) => values.Count == 0 ? "(none)" : string.Join(", ", values);
 
     private static string GetDisplayPath(string? filePath, string repoRootPath)
     {
-        if (string.IsNullOrWhiteSpace(filePath))
-        {
-            return string.Empty;
-        }
-
+        if (string.IsNullOrWhiteSpace(filePath)) return string.Empty;
         var fullPath = Path.GetFullPath(filePath);
         var root = Path.GetFullPath(repoRootPath);
-        if (!string.IsNullOrWhiteSpace(root) && fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
-        {
-            return Path.GetRelativePath(root, fullPath);
-        }
-
-        return fullPath;
+        if (!string.IsNullOrWhiteSpace(root) && fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return Path.GetRelativePath(root, fullPath).Replace('\\', '/');
+        return fullPath.Replace('\\', '/');
     }
 
-    private static string FormatOptionalBool(bool? value)
-    {
-        return value.HasValue ? value.Value.ToString() : "(default)";
-    }
+    private static string FormatOptionalBool(bool? value) => value.HasValue ? value.Value.ToString() : "(default)";
 }
