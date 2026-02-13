@@ -1,6 +1,6 @@
 # ArchIntel
 
-![CI](https://img.shields.io/badge/CI-passing-brightgreen)
+[![CI](https://github.com/PaulJMaddison/arch-intel-dotnet/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](LICENSE)
 
 **Local folder architecture intelligence for large .NET solutions.** ArchIntel is a .NET 8 CLI (`arch`) that runs entirely on your machine, producing deterministic reports without sending source code anywhere.
