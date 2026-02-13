@@ -105,6 +105,28 @@ public sealed class InsightsReportTests
 
         Assert.NotEmpty(data.DeterministicRules);
         Assert.Contains(data.DeterministicRules, rule => rule.Contains("cycle_severity_score", StringComparison.Ordinal));
+        Assert.Equal(data.DeterministicRules.OrderBy(rule => rule, StringComparer.Ordinal), data.DeterministicRules);
+        Assert.All(data.DeterministicRules, rule =>
+        {
+            Assert.DoesNotContain('\r', rule);
+            Assert.DoesNotContain('\n', rule);
+        });
+    }
+
+    [Fact]
+    public void DeterministicRuleFormatter_SanitizesAndSortsRules()
+    {
+        var rules = new[]
+        {
+            "zeta rule\r\nwith newline",
+            " alpha\t\t rule ",
+            "beta\nrule"
+        };
+
+        var formatted = DeterministicRuleFormatter.SanitizeAndSort(rules);
+
+        Assert.Equal(new[] { "alpha rule", "beta rule", "zeta rule with newline" }, formatted);
+        Assert.All(formatted, rule => Assert.False(string.IsNullOrWhiteSpace(rule)));
     }
 
     private static Solution CreateGraphSolution()

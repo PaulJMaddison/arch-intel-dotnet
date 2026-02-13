@@ -65,6 +65,44 @@ public sealed class ArtifactConsistencyTests
         Assert.Equal(TestDetectionReason.MicrosoftNetTestSdk, testFacts.TestDetectionReason);
     }
 
+    [Fact]
+    public void ProjectFacts_DoesNotTreatBunitOrPlaywrightAloneAsTestProjects()
+    {
+        using var temp = new TemporaryDirectory();
+        var repo = temp.Path;
+        var bunitProj = CreateProject(repo, "src/Ui/Ui.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup><PackageReference Include=\"bunit\" Version=\"1.0.0\" /></ItemGroup></Project>");
+        var playwrightProj = CreateProject(repo, "src/Automation/Automation.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup><PackageReference Include=\"Microsoft.Playwright\" Version=\"1.0.0\" /></ItemGroup></Project>");
+        var namedTestProj = CreateProject(repo, "tests/Ui.UITests/Ui.UITests.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup><PackageReference Include=\"bunit\" Version=\"1.0.0\" /></ItemGroup></Project>");
+
+        var workspace = new AdhocWorkspace();
+        var solution = workspace.CurrentSolution;
+        var bunitId = ProjectId.CreateNewId();
+        var playwrightId = ProjectId.CreateNewId();
+        var namedTestId = ProjectId.CreateNewId();
+        solution = solution.AddProject(ProjectInfo.Create(bunitId, VersionStamp.Create(), "Ui", "Ui", LanguageNames.CSharp, filePath: bunitProj));
+        solution = solution.AddProject(ProjectInfo.Create(playwrightId, VersionStamp.Create(), "Automation", "Automation", LanguageNames.CSharp, filePath: playwrightProj));
+        solution = solution.AddProject(ProjectInfo.Create(namedTestId, VersionStamp.Create(), "Ui.UITests", "Ui.UITests", LanguageNames.CSharp, filePath: namedTestProj));
+
+        var bunitFacts = ProjectFacts.Get(solution.GetProject(bunitId)!, repo, new AnalysisConfig());
+        var playwrightFacts = ProjectFacts.Get(solution.GetProject(playwrightId)!, repo, new AnalysisConfig());
+        var namedTestFacts = ProjectFacts.Get(solution.GetProject(namedTestId)!, repo, new AnalysisConfig());
+
+        Assert.False(bunitFacts.IsTestProject);
+        Assert.Equal(TestDetectionReason.DefaultFalse, bunitFacts.TestDetectionReason);
+        Assert.False(playwrightFacts.IsTestProject);
+        Assert.Equal(TestDetectionReason.DefaultFalse, playwrightFacts.TestDetectionReason);
+        Assert.True(namedTestFacts.IsTestProject);
+        Assert.Equal(TestDetectionReason.NamePattern, namedTestFacts.TestDetectionReason);
+    }
+
+    private static string CreateProject(string repoRoot, string relativePath, string content)
+    {
+        var path = Path.Combine(repoRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, content);
+        return path;
+    }
+
     private static AnalysisContext CreateContext(Solution solution)
     {
         return new AnalysisContext("/repo/app.sln", "/repo", solution, new AnalysisConfig(), NullLogger.Instance, solution.Projects.Count(), 0);

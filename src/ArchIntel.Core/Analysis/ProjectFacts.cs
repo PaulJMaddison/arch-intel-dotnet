@@ -38,8 +38,8 @@ public sealed record ProjectFactsResult(
 
 public static class ProjectFacts
 {
-    private static readonly string[] TestNamePatterns = [".Tests", ".UnitTests", ".IntegrationTests", ".E2E"];
-    private static readonly string[] TestPackages = ["xunit", "nunit", "mstest", "bunit", "coverlet", "microsoft.playwright"];
+    private static readonly string[] TestNamePatterns = [".Tests", ".UnitTests", ".IntegrationTests", ".E2E", ".UITests"];
+    private static readonly string[] StrongTestFrameworkPackages = ["xunit", "nunit", "mstest.testframework", "mstest.sdk", "coverlet.collector"];
     private static readonly string[] AspNetPackages = ["microsoft.aspnetcore"];
     private static readonly string[] DataPackages = ["microsoft.entityframeworkcore", "dapper"];
     private static readonly Regex GlobTokenRegex = new("([.^$+{}()|\\[\\]\\\\])", RegexOptions.Compiled);
@@ -72,12 +72,13 @@ public static class ProjectFacts
             return (true, TestDetectionReason.Property);
         }
 
-        if (metadata.PackageReferences.Any(p => string.Equals(p, "microsoft.net.test.sdk", StringComparison.OrdinalIgnoreCase)))
+        var hasMicrosoftNetTestSdk = metadata.PackageReferences.Any(p => string.Equals(p, "microsoft.net.test.sdk", StringComparison.OrdinalIgnoreCase));
+        if (hasMicrosoftNetTestSdk)
         {
             return (true, TestDetectionReason.MicrosoftNetTestSdk);
         }
 
-        if (metadata.PackageReferences.Any(p => TestPackages.Any(marker => p.Contains(marker, StringComparison.OrdinalIgnoreCase))))
+        if (metadata.PackageReferences.Any(IsStrongTestFrameworkPackage))
         {
             return (true, TestDetectionReason.TestFrameworkPackage);
         }
@@ -188,6 +189,18 @@ public static class ProjectFacts
             .Replace("*", ".*")
             .Replace("?", ".");
         return Regex.IsMatch(input, $"^{escaped}$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    }
+
+    private static bool IsStrongTestFrameworkPackage(string packageId)
+    {
+        if (string.IsNullOrWhiteSpace(packageId))
+        {
+            return false;
+        }
+
+        return StrongTestFrameworkPackages.Any(marker =>
+            string.Equals(packageId, marker, StringComparison.OrdinalIgnoreCase)
+            || packageId.StartsWith($"{marker}.", StringComparison.OrdinalIgnoreCase));
     }
 
     private static CsprojMetadata ReadMetadata(string? projectFilePath)

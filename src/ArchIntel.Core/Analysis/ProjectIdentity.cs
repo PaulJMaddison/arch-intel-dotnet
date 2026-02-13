@@ -22,9 +22,6 @@ public static class ProjectIdentity
             return project.Name.ToLowerInvariant();
         }
 
-        var fullPath = Path.GetFullPath(project.FilePath);
-        var repoRoot = Path.GetFullPath(repoRootPath);
-        var relative = Path.GetRelativePath(repoRoot, fullPath);
-        return relative.Replace('\\', '/').ToLowerInvariant();
+        return CanonicalPath.Normalize(project.FilePath, repoRootPath);
     }
 }

@@ -48,3 +48,8 @@ You can also set strict defaults in `.archintel/config.json` via the `strict` bl
 - **"NUxxxx" warnings**: restore packages and review version conflicts.
 
 If issues persist, try `arch --verbose scan --solution <path>` and review the diagnostics in `scan_summary.json`.
+
+## Deterministic path and test detection behavior
+- Artifact project paths are canonicalized to repo-relative form with `/` separators and no trailing slash. This prevents false drift when paths differ only by `\` vs `/`.
+- Test project detection uses strong signals only: `<IsTestProject>true</IsTestProject>`, `Microsoft.NET.Test.Sdk`, specific test framework packages, or explicit test-name suffixes (for example `.Tests` and `.UITests`).
+- `scan.json` `DeterministicRules` values are sanitized to single-line strings and sorted alphabetically for stable diffs.
