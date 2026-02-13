@@ -615,7 +615,7 @@ public sealed class SymbolIndex
             return null;
         }
 
-        return Path.GetRelativePath(fullRoot, fullPath);
+        return Path.GetRelativePath(fullRoot, fullPath).Replace('\\', '/');
     }
 
     private static class NamespaceHelper
