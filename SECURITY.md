@@ -9,7 +9,7 @@ ArchIntel is designed to be local-first by default:
 Reports are written to `./.archintel` and are intended to be high-level summaries suitable for sharing internally.
 
 ## Reporting a vulnerability
-Please report security issues privately by emailing **security@example.com**. Include:
+Please report security issues privately by emailing **paul.maddison.delimeg@gmail.com**. Include:
 - A clear description of the issue
 - Steps to reproduce
 - Potential impact
