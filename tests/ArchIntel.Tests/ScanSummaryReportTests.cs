@@ -113,6 +113,46 @@ public sealed class ScanSummaryReportTests
         Assert.Contains("Controller [public]", markdown, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ScanReceiptWriteAsync_SerializesDeterministicRulesAsSingleLineSortedStrings()
+    {
+        using var temp = new TemporaryDirectory();
+        var outputDir = Path.Combine(temp.Path, "output");
+        var cacheDir = Path.Combine(temp.Path, "cache");
+        Directory.CreateDirectory(outputDir);
+
+        var solution = CreateSolutionWithDocument();
+        var config = new AnalysisConfig
+        {
+            OutputDir = outputDir,
+            CacheDir = cacheDir,
+            MaxDegreeOfParallelism = 1
+        };
+
+        var context = new AnalysisContext(
+            "/repo/arch.sln",
+            "/repo",
+            solution,
+            config,
+            NullLogger.Instance,
+            solution.Projects.Count(),
+            0);
+
+        await ScanReceiptReport.WriteAsync(context, new PhysicalFileSystem(), outputDir, CancellationToken.None);
+
+        var json = await File.ReadAllTextAsync(Path.Combine(outputDir, "scan.json"));
+        using var document = JsonDocument.Parse(json);
+        var rules = document.RootElement.GetProperty("DeterministicRules").EnumerateArray().Select(v => v.GetString()!).ToArray();
+
+        Assert.Equal(rules.OrderBy(rule => rule, StringComparer.Ordinal), rules);
+        Assert.All(rules, rule =>
+        {
+            Assert.DoesNotContain('\r', rule);
+            Assert.DoesNotContain('\n', rule);
+            Assert.False(string.IsNullOrWhiteSpace(rule));
+        });
+    }
+
     private static Solution CreateSolutionWithDocument()
     {
         var workspace = new AdhocWorkspace();

@@ -91,6 +91,39 @@ public sealed class ArchitectureRulesEngineTests
         Assert.Contains(updatedResult.Drift.AddedDependencies, edge => edge.FromName == "MyApp.Application" && edge.ToName == "MyApp.Domain");
     }
 
+    [Fact]
+    public async Task AnalyzeAsync_DoesNotReportDrift_WhenProjectPathsOnlyDifferBySeparators()
+    {
+        using var tempDir = new TempDirectory();
+        var engine = new ArchitectureRulesEngine(new PhysicalFileSystem());
+
+        var firstSolution = CreateSolution(builder =>
+        {
+            var api = builder.AddProject("MyApp.Api", "/repo/src/MyApp.Api/MyApp.Api.csproj");
+            var app = builder.AddProject("MyApp.Application", "/repo/src/MyApp.Application/MyApp.Application.csproj");
+            builder.AddReference(api, app);
+        });
+
+        var firstContext = CreateContext(firstSolution, tempDir.Path);
+        await engine.AnalyzeAsync(firstContext, CancellationToken.None);
+
+        var secondSolution = CreateSolution(builder =>
+        {
+            var api = builder.AddProject("MyApp.Api", "/repo\\src\\MyApp.Api\\MyApp.Api.csproj");
+            var app = builder.AddProject("MyApp.Application", "/repo\\src\\MyApp.Application\\MyApp.Application.csproj");
+            builder.AddReference(api, app);
+        });
+
+        var secondContext = CreateContext(secondSolution, tempDir.Path);
+        var secondResult = await engine.AnalyzeAsync(secondContext, CancellationToken.None);
+
+        Assert.True(secondResult.Drift.BaselineAvailable);
+        Assert.Empty(secondResult.Drift.AddedProjects);
+        Assert.Empty(secondResult.Drift.RemovedProjects);
+        Assert.Empty(secondResult.Drift.AddedDependencies);
+        Assert.Empty(secondResult.Drift.RemovedDependencies);
+    }
+
     private static AnalysisContext CreateContext(Solution solution, string cacheDir)
     {
         var config = new AnalysisConfig

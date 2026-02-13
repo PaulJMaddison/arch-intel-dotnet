@@ -38,7 +38,7 @@ public static class ScanReceiptReport
             .Select(project =>
             {
                 var facts = ProjectFacts.Get(project, context.RepoRootPath, context.Config);
-                return new ScanReceiptProject(facts.ProjectId, facts.RoslynProjectId, project.Name, GetDisplayPath(project.FilePath, context.RepoRootPath));
+                return new ScanReceiptProject(facts.ProjectId, facts.RoslynProjectId, project.Name, CanonicalPath.Normalize(project.FilePath, context.RepoRootPath));
             })
             .OrderBy(project => project.Path, StringComparer.Ordinal)
             .ThenBy(project => project.Name, StringComparer.Ordinal)
@@ -61,7 +61,7 @@ public static class ScanReceiptReport
             include,
             exclude,
             projects,
-            InsightsReport.DeterministicRules);
+            DeterministicRuleFormatter.SanitizeAndSort(InsightsReport.DeterministicRules));
     }
 
     public static string BuildMarkdown(ScanReceiptReportData data, SymbolIndexData? symbolData = null)
@@ -167,15 +167,6 @@ public static class ScanReceiptReport
     }
 
     private static string FormatList(IReadOnlyList<string> values) => values.Count == 0 ? "(none)" : string.Join(", ", values);
-
-    private static string GetDisplayPath(string? filePath, string repoRootPath)
-    {
-        if (string.IsNullOrWhiteSpace(filePath)) return string.Empty;
-        var fullPath = Path.GetFullPath(filePath);
-        var root = Path.GetFullPath(repoRootPath);
-        if (!string.IsNullOrWhiteSpace(root) && fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return Path.GetRelativePath(root, fullPath).Replace('\\', '/');
-        return fullPath.Replace('\\', '/');
-    }
 
     private static string FormatOptionalBool(bool? value) => value.HasValue ? value.Value.ToString() : "(default)";
 }

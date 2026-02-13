@@ -16,7 +16,7 @@ public static class ProjectGraphBuilder
         foreach (var project in projects)
         {
             var facts = ProjectFacts.Get(project, repoRootPath, config);
-            var path = GetDisplayPath(project.FilePath, repoRootPath);
+            var path = CanonicalPath.Normalize(project.FilePath, repoRootPath);
             var node = new ProjectNode(
                 facts.ProjectId,
                 project.Name,
@@ -67,27 +67,6 @@ public static class ProjectGraphBuilder
             new ReadOnlyCollection<ProjectEdge>(edges),
             new ReadOnlyCollection<IReadOnlyList<string>>(cycles.ToList()));
     }
-
-    private static string GetDisplayPath(string? filePath, string repoRootPath)
-    {
-        if (string.IsNullOrWhiteSpace(filePath))
-        {
-            return string.Empty;
-        }
-
-        var fullPath = Path.GetFullPath(filePath);
-        if (!string.IsNullOrWhiteSpace(repoRootPath))
-        {
-            var root = Path.GetFullPath(repoRootPath);
-            if (fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
-            {
-                return Path.GetRelativePath(root, fullPath).Replace('\\', '/');
-            }
-        }
-
-        return fullPath.Replace('\\', '/');
-    }
-
     private static Dictionary<string, List<string>> BuildAdjacency(
         IReadOnlyList<ProjectNode> nodes,
         IReadOnlyList<ProjectEdge> edges)
