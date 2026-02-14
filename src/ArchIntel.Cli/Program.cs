@@ -1,4 +1,5 @@
 using ArchIntel.Analysis;
+using ArchIntel.IO;
 using ArchIntel.Logging;
 using ArchIntel.Reports;
 using Microsoft.Extensions.Logging;
@@ -88,7 +89,7 @@ internal static class Program
                 reportKind,
                 symbol,
                 openOutput,
-                BuildCliInvocation(context.ParseResult),
+                BuildCliInvocation(context.ParseResult, solution, output, configPath),
                 CancellationToken.None);
         }
 
@@ -180,10 +181,43 @@ internal static class Program
         }
     }
 
-    private static string BuildCliInvocation(ParseResult parseResult)
+    private static string BuildCliInvocation(ParseResult parseResult, string? solutionPath, string? outputPath, string? configPath)
     {
-        var tokens = parseResult.Tokens.Select(token => token.Value).ToArray();
+        var cwd = Directory.GetCurrentDirectory();
+        var tokens = parseResult.Tokens
+            .Select(token => SanitizeInvocationToken(token.Value, cwd, solutionPath, outputPath, configPath))
+            .ToArray();
         return tokens.Length == 0 ? "arch" : $"arch {string.Join(' ', tokens)}";
+    }
+
+    private static string SanitizeInvocationToken(string token, string currentDirectory, params string?[] candidatePaths)
+    {
+        foreach (var candidatePath in candidatePaths)
+        {
+            if (string.IsNullOrWhiteSpace(candidatePath))
+            {
+                continue;
+            }
+
+            var normalizedCandidate = Path.GetFullPath(candidatePath);
+            if (Path.IsPathRooted(token) && PathsEqual(token, normalizedCandidate))
+            {
+                return CanonicalPath.Normalize(normalizedCandidate, currentDirectory);
+            }
+
+            if (string.Equals(token, candidatePath, StringComparison.Ordinal))
+            {
+                return CanonicalPath.Normalize(normalizedCandidate, currentDirectory);
+            }
+        }
+
+        return token;
+    }
+
+    private static bool PathsEqual(string left, string right)
+    {
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        return string.Equals(Path.GetFullPath(left), Path.GetFullPath(right), comparison);
     }
 
 }

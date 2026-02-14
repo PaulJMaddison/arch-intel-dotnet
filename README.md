@@ -103,7 +103,7 @@ Exit codes:
 - `3`: unexpected crash (unhandled exception).
 
 ## Release bundle (win-x64)
-Download the zip from `releases/archintel-v0.1.0-win-x64.zip`, unzip it, and run `arch` from a terminal.
+Download the zip from `releases/archintel-v1.0.0-win-x64.zip`, unzip it, and run `arch` from a terminal.
 
 ## Performance
 - **Caching:** the cache under `./.archintel/cache` stores document hashes to speed up repeat scans without changing outputs.
@@ -113,28 +113,44 @@ Download the zip from `releases/archintel-v0.1.0-win-x64.zip`, unzip it, and run
 ## Works without AI. Optional AI guidance.
 ArchIntel works entirely without AI. If you choose to integrate AI guidance, that is optional and must be configured outside of the core tool. The open-source CLI never uploads source code by default. 
 
-## Using ArchIntel outputs with AI tools (optional)
+## Using ArchIntel outputs with your own AI (no repo upload)
 
-ArchIntel is designed to produce structured, deterministic artifacts that can be used with any AI tool of your choice.
+Run ArchIntel locally:
 
-ArchIntel produces a deterministic `.archintel/` folder containing structured JSON + Markdown artifacts that describe a .NET solution’s architecture (projects, dependencies, namespaces, symbols, packages, docs, and violations).
+```bash
+arch scan --solution <path>
+```
 
-That means you can get high-quality AI assistance **without zipping or uploading the entire codebase** — which is often impossible for large repos or restricted environments.
+Then paste these artifacts into your AI assistant:
 
-Common workflows:
+- `.archintel/scan_summary.json`
+- `.archintel/projects.json`
+- `.archintel/project_graph.json`
+- `.archintel/namespaces.json`
+- `.archintel/symbols.json`
+- `.archintel/packages.json`
+- `.archintel/docs.json`
+- `.archintel/violations.json`
 
-Paste scan_summary.json to ask for a high-level architecture overview.
-Paste namespaces.json to identify large namespaces, hot spots, or boundary candidates.
-Paste symbols.json to explore public APIs and dependency surfaces.
-Paste scan.md (if generated) for human-readable context.
-
-This allows teams to use AI for interpretation and reasoning without granting AI tools direct access to source code or repositories. The open-source CLI never uploads source code or connects to external services.
+This gives you architecture summaries and remediation plans **without zipping or uploading source code**. It works well for huge and private repos because only deterministic artifacts are shared.
 
 ## Library / NuGet note: 
-v0.1 focuses on the CLI and report artifacts. NuGet packages may be introduced in a future release to support integrations (e.g., IDE or agent layers). Until then, public compatibility guarantees apply only to the CLI contract and output formats.
+v1.0.0 focuses on the CLI and report artifacts. NuGet packages may be introduced in a future release to support integrations (e.g., IDE or agent layers). Until then, public compatibility guarantees apply only to the CLI contract and output formats.
 
 ## Pro & Enterprise
-We offer commercial licensing for teams that want access to advanced modules such as architecture governance, performance and scalability analysis, private extensions, and enterprise support. Commercial capabilities are delivered on an outcome basis. No public roadmap commitments are made in the open source repository.
+Commercial features are delivered outside this OSS repository. The OSS CLI remains local-first and does not include Copilot/AI modules.
+
+- Persona reports (architect / new dev / contractor onboarding)
+- Ask/Q&A over ArchIntel artifacts with guardrails (no source code ingestion)
+- Context pack generation v2 with derived metrics (fan-in/out, core/risky projects, cycle severity)
+- Performance module (code + IO + ORM + DB guidance; trace capture workflow)
+- User story module (targets relevant files using ArchIntel index to reduce AI cost; optional safe patch plan)
+- PR-ready change plan module (Mode C: patch plan, safety gates, dry-run)
+- Enterprise support + private extensions
+
+Contact: paul.maddison.delimeg
+
+Commercial capabilities are outcome-based. No public roadmap commitments are made in the open-source repository.
 
 ## License
 This project is dual-licensed under AGPLv3 and a commercial license. See [LICENSE](LICENSE) and [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md).

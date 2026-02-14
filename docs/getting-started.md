@@ -1,7 +1,7 @@
 # Getting started (5-minute guide)
 
 ## 1) Install
-Grab the release bundle (for Windows, `releases/archintel-v0.1.0-win-x64.zip`) and unzip it. Add the folder to your PATH or run `arch` from the extracted directory.
+Grab the release bundle (for Windows, `releases/archintel-v1.0.0-win-x64.zip`) and unzip it. Add the folder to your PATH or run `arch` from the extracted directory.
 
 ## 2) Run a scan
 From your repo root:

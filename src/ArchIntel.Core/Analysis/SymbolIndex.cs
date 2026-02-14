@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.Json.Serialization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -16,9 +17,9 @@ public sealed record SymbolIndexEntry(
     string Visibility,
     string? BaseType,
     IReadOnlyList<string> Interfaces,
-    int DeclaredPublicMethodCount,
-    int PubliclyReachableMethodCount,
-    int TotalMethodCount,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? DeclaredPublicMethodCount,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? PubliclyReachableMethodCount,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? TotalMethodCount,
     IReadOnlyList<string> Attributes,
     string? RelativePath);
 
@@ -271,7 +272,9 @@ public sealed class SymbolIndex
             var baseType = GetBaseTypeName(syntaxSymbol.Symbol);
             var interfaces = GetInterfaces(syntaxSymbol.Symbol);
             var attributes = GetFrameworkAttributes(syntaxSymbol.Symbol);
-            var (declaredPublicMethodCount, publiclyReachableMethodCount, totalMethodCount) = GetMethodCounts(syntaxSymbol.Symbol);
+            var (declaredPublicMethodCount, publiclyReachableMethodCount, totalMethodCount) = syntaxSymbol.Kind == SymbolKind.NamedType
+                ? GetMethodCounts(syntaxSymbol.Symbol)
+                : ((int?)null, (int?)null, (int?)null);
             return new SymbolIndexEntry(
                 symbolId,
                 syntaxSymbol.Kind.ToString(),
@@ -303,9 +306,9 @@ public sealed class SymbolIndex
             "unknown",
             null,
             Array.Empty<string>(),
-            0,
-            0,
-            0,
+            null,
+            null,
+            null,
             Array.Empty<string>(),
             relativePath);
     }
@@ -350,15 +353,15 @@ public sealed class SymbolIndex
                         semanticModel.GetDeclaredSymbol(delegateDeclaration, cancellationToken));
                     break;
                 case MethodDeclarationSyntax methodDeclaration:
-                {
-                    var methodSymbol = semanticModel.GetDeclaredSymbol(methodDeclaration, cancellationToken) as IMethodSymbol;
-                    if (IsCountedMethod(methodSymbol))
                     {
-                        yield return SyntaxSymbol.CreateMethod(methodDeclaration, methodSymbol);
-                    }
+                        var methodSymbol = semanticModel.GetDeclaredSymbol(methodDeclaration, cancellationToken) as IMethodSymbol;
+                        if (IsCountedMethod(methodSymbol))
+                        {
+                            yield return SyntaxSymbol.CreateMethod(methodDeclaration, methodSymbol);
+                        }
 
-                    break;
-                }
+                        break;
+                    }
             }
         }
     }
