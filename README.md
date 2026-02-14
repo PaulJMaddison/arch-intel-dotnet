@@ -148,7 +148,7 @@ Commercial features are delivered outside this OSS repository. The OSS CLI remai
 - PR-ready change plan module (Mode C: patch plan, safety gates, dry-run)
 - Enterprise support + private extensions
 
-Contact: paul.maddison.delimeg
+Contact: paul.maddison.delimeg@gmail.com
 
 Commercial capabilities are outcome-based. No public roadmap commitments are made in the open-source repository.
 
