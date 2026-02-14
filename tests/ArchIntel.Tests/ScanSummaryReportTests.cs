@@ -115,6 +115,27 @@ public sealed class ScanSummaryReportTests
         Assert.Contains("Controller [public]", markdown, StringComparison.Ordinal);
     }
 
+
+    [Fact]
+    public void ScanReceipt_Create_PreservesActualCliInvocation()
+    {
+        var solution = CreateSolutionWithDocument();
+        var context = new AnalysisContext(
+            "/repo/arch.sln",
+            "/repo",
+            solution,
+            new AnalysisConfig { OutputDir = "/repo/.archintel", CacheDir = "/repo/.archintel/cache", MaxDegreeOfParallelism = 1 },
+            NullLogger.Instance,
+            solution.Projects.Count(),
+            0,
+            cliInvocation: "arch passport --solution ./arch.sln --format json");
+
+        var data = ScanReceiptReport.Create(context);
+
+        Assert.Equal("arch passport --solution ./arch.sln --format json", data.CliInvocation);
+        Assert.DoesNotContain("arch violations", data.CliInvocation, StringComparison.Ordinal);
+    }
+
     private static Solution CreateSolutionWithDocument()
     {
         var workspace = new AdhocWorkspace();
@@ -131,7 +152,7 @@ public sealed class ScanSummaryReportTests
         solution = solution.AddDocument(
             DocumentId.CreateNewId(projectId),
             "Program.cs",
-            SourceText.From("namespace App; public class Program { }") ,
+            SourceText.From("namespace App; public class Program { }"),
             filePath: "/repo/src/App/Program.cs");
 
         return solution;

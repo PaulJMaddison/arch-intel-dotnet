@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using ArchIntel.Analysis;
@@ -103,6 +104,8 @@ public sealed class ScanIntegrationTests
 
             foreach (var ns in namespaces)
             {
+                Assert.False(ns.TryGetProperty("DeprecatedPublicMethodCount", out _));
+
                 declaredTotal += ns.GetProperty("DeclaredPublicMethodCount").GetInt32();
                 reachableTotal += ns.GetProperty("PubliclyReachableMethodCount").GetInt32();
                 methodsTotal += ns.GetProperty("TotalMethodCount").GetInt32();
@@ -130,7 +133,22 @@ public sealed class ScanIntegrationTests
         {
             Assert.True(symbol.TryGetProperty("ProjectId", out var symbolProjectId));
             Assert.Contains(symbolProjectId.GetString()!, projectIds);
+
+            if (string.Equals(symbol.GetProperty("Kind").GetString(), "PublicMethod", StringComparison.Ordinal))
+            {
+                Assert.False(symbol.TryGetProperty("DeclaredPublicMethodCount", out _));
+                Assert.False(symbol.TryGetProperty("PubliclyReachableMethodCount", out _));
+                Assert.False(symbol.TryGetProperty("TotalMethodCount", out _));
+            }
         }
+    }
+
+    [Fact]
+    public void AnalysisVersion_UsesV1BaseVersion()
+    {
+        var info = typeof(AnalysisContext).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
+        Assert.NotNull(info);
+        Assert.StartsWith("1.0.0", info!.InformationalVersion, StringComparison.Ordinal);
     }
 
     private static async Task<Dictionary<string, string>> RunScanAsync(
