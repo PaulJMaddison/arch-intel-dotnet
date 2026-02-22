@@ -5,6 +5,24 @@
 
 **Local folder architecture intelligence for large .NET solutions.** ArchIntel is a .NET 8 CLI (`arch`) that runs entirely on your machine, producing deterministic reports without sending source code anywhere.
 
+## Elevator pitch
+ArchIntel gives you the architecture visibility of an enterprise governance platform in a single local CLI. Point it at a solution, run one command, and get actionable architecture reports your team can use immediately in planning, modernization, onboarding, and CI guardrails.
+
+If your codebase is too large for gut-feel decisions, ArchIntel helps you replace assumptions with evidence.
+
+## Why teams choose ArchIntel
+- **Ship change with confidence.** Understand dependency blast radius before touching core services.
+- **Reduce architecture drift.** Catch layer violations and risky coupling trends early.
+- **Move faster in big repos.** Give new contributors a map instead of asking them to reverse-engineer the system.
+- **Support modernization with facts.** Prioritize refactors using repeatable reports, not anecdotes.
+- **Keep compliance simple.** Analyze locally and keep sensitive source code in your environment.
+
+## Outcomes you can expect
+- Faster technical discovery during sprint planning and incident response.
+- Clearer architecture conversations between architects, staff engineers, and feature teams.
+- More predictable CI quality gates with deterministic, diff-friendly outputs.
+- Less time wasted chasing hidden dependencies across solution boundaries.
+
 ## Why ArchIntel
 - **Local folder** Runs against cloned repositories with zero external dependencies.
 - **Architecture intelligence.** Produces structured insights about projects, layers, dependencies, and drift.
@@ -15,6 +33,19 @@
 - Architects and platform teams enforcing guardrails across large solutions.
 - Engineering leads who need repeatable insights in CI and local workflows.
 - Security and privacy conscious teams that keep source code on device.
+
+### Ideal use cases
+- **Monolith-to-modular initiatives:** map boundaries and identify high-coupling hotspots.
+- **M&A / inherited codebases:** rapidly understand unknown solutions before major changes.
+- **Regulated environments:** keep analysis local while still producing governance artifacts.
+- **Platform engineering:** standardize architecture checks across many repositories.
+- **Developer onboarding:** shorten time-to-first-meaningful-change with architecture passports.
+
+## Why ArchIntel vs. generic tooling
+- Built specifically for **large .NET solution structures** and architecture-level understanding.
+- Produces **deterministic machine-readable artifacts** you can plug into CI, scripts, and custom workflows.
+- Designed for **local-first operation** with zero always-on infrastructure.
+- Gives teams a pragmatic middle ground between ad-hoc scripts and heavyweight enterprise platforms.
 
 ## What it is not
 - A hosted SaaS or cloud only analyzer.
